@@ -10,8 +10,16 @@ info:
     - Client API (/client/*): For institution/client operations
 
 tags:
-  - name: Client
-    description: Institution/client specific operations including authentication
+  - name: Authentication
+    description: Authentication operations for client access
+  - name: Streak
+    description: Operations for managing user streaks
+  - name: Badges
+    description: Operations for managing user badges and rewards
+  - name: Points
+    description: Operations for managing user points and balances
+  - name: Learning Academy
+    description: Operations for accessing learning paths and lessons
 
 servers:
   - url: https://production-doshi-api-8kq2.encr.app
@@ -676,7 +684,7 @@ components:
 paths:
   /client/auth/token:
     post:
-      tags: [Client]
+      tags: [Authentication]
       summary: Get client authentication token
       description: |
         Authenticates an institution/client and provides an access token.
@@ -716,7 +724,7 @@ paths:
 
   /client/users/{userId}/streak:
     get:
-      tags: [Client]
+      tags: [Streak]
       summary: Get user's streak information
       description: Retrieves the current streak information for a specific user
       security:
@@ -755,7 +763,7 @@ paths:
                 $ref: "#/components/schemas/Error"
 
     put:
-      tags: [Client]
+      tags: [Streak]
       summary: Update user's streak
       description: Updates the streak information for a specific user
       security:
@@ -801,7 +809,7 @@ paths:
 
   /client/users/{userId}/badges:
     get:
-      tags: [Client]
+      tags: [Badges]
       summary: Get user's badge rewards
       description: Retrieves all badge rewards earned by a specific user
       security:
@@ -846,7 +854,7 @@ paths:
 
   /client/users/{userId}/balance:
     get:
-      tags: [Client]
+      tags: [Points]
       summary: Get user's balance information
       description: Retrieves the current balance information including Dosh, Life, and XP for a specific user
       security:
@@ -886,7 +894,7 @@ paths:
 
   /client/paths/{pathId}:
     get:
-      tags: [Client]
+      tags: [Learning Academy]
       summary: Get path information
       description: Retrieves detailed information about a path including its levels and lessons
       security:
@@ -926,7 +934,7 @@ paths:
 
   /client/lessons/{lessonId}:
     get:
-      tags: [Client]
+      tags: [Learning Academy]
       summary: Get detailed lesson information
       description: Retrieves detailed information about a lesson including its slides and questions
       security:
