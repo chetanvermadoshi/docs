@@ -1,0 +1,193 @@
+# iFrame Code Snippets
+
+## TypeScript Interfaces
+
+```typescript
+interface AuthData {
+  token: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  partnerUserId: string;
+  pathId: string;
+  segment: string;
+  branchId: string;
+}
+
+interface IframeMessage {
+  type: string;
+  [key: string]: any;
+}
+```
+
+## React iFrame Implementation
+
+```tsx
+import React, { useEffect, useState } from "react";
+
+interface Props {
+  authData: AuthData;
+}
+
+const IframeComponent: React.FC<Props> = ({ authData }) => {
+  const [isLoadingAuth, setIsLoadingAuth] = useState(false);
+
+  useEffect(() => {
+    // Setup message listener
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data: IframeMessage =
+          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+
+        // When we receive PING from iframe, send the auth data
+        if (data.type === "PING") {
+          handleSendAuth();
+        }
+      } catch (error) {
+        console.error("Error processing message:", error);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  const handleSendAuth = async () => {
+    setIsLoadingAuth(true);
+
+    // Filter out empty values from authData
+    const filteredAuthData = Object.fromEntries(
+      Object.entries(authData).filter(([_, value]) => value !== "")
+    );
+
+    // Find the iframe and send message
+    const iframe = document.querySelector("iframe");
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage(
+        JSON.stringify({
+          ...filteredAuthData,
+          type: "AUTH",
+        }),
+        "*"
+      );
+    }
+
+    setIsLoadingAuth(false);
+  };
+
+  return (
+    <div className="iframe-container">
+      <iframe
+        src="https://embed.doshi.app"
+        className="h-full w-full"
+        frameBorder="0"
+        allowFullScreen
+      />
+    </div>
+  );
+};
+
+export default IframeComponent;
+```
+
+## Pure JavaScript Implementation
+
+```javascript
+// Define your auth data
+const authData = {
+  token: "",
+  email: "",
+  firstName: "",
+  lastName: "",
+  partnerUserId: "",
+  pathId: "",
+  segment: "",
+  branchId: "",
+};
+
+// Create and add iframe to the page
+const iframe = document.createElement("iframe");
+iframe.src = "https://embed.doshi.app";
+iframe.className = "h-full w-full";
+iframe.frameBorder = "0";
+iframe.allowFullscreen = true;
+
+document.querySelector("#your-container-id").appendChild(iframe);
+
+// Handle messages from iframe
+function handleMessage(event) {
+  try {
+    const data =
+      typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+
+    // When we receive PING from iframe, send the auth data
+    if (data.type === "PING") {
+      // Filter out empty values from authData
+      const filteredAuthData = Object.fromEntries(
+        Object.entries(authData).filter(([_, value]) => value !== "")
+      );
+
+      // Send auth data to iframe
+      iframe.contentWindow.postMessage(
+        JSON.stringify({
+          ...filteredAuthData,
+          type: "AUTH",
+        }),
+        "*"
+      );
+    }
+  } catch (error) {
+    console.error("Error processing message:", error);
+  }
+}
+
+// Add message listener
+window.addEventListener("message", handleMessage);
+```
+
+## Sending Messages to Iframe
+
+```tsx
+const sendMessageToIframe = (message: any) => {
+  if (iframeRef.current?.contentWindow) {
+    iframeRef.current.contentWindow.postMessage(
+      JSON.stringify(message),
+      "https://embed.doshi.app"
+    );
+  }
+};
+```
+
+## Environment-Aware Implementation
+
+```tsx
+const IframeWithEnvironment: React.FC = () => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      src={"https://embed.doshi.app"}
+      className="h-full w-full"
+      frameBorder="0"
+    />
+  );
+};
+```
+
+## Styling Best Practices
+
+```css
+.iframe-container {
+  /* Responsive container */
+  width: 100%;
+  height: 900px;
+  overflow: hidden;
+}
+
+.iframe-container iframe {
+  /* Full dimensions */
+  width: 100%;
+  height: 100%;
+}
+```

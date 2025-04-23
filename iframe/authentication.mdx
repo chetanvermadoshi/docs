@@ -1,0 +1,80 @@
+# iFrame Authentication Guide
+
+## Overview
+
+This guide explains how to implement secure iframe-based authentication in web applications, specifically focusing on parent-child window communication.
+
+## Security Considerations
+
+1. **Origin Verification**
+
+   - Always verify the origin of messages received from the iFrame
+   - Implement proper message validation
+   - Use HTTPS for secure communication
+
+2. **Cross-Origin Communication**
+   - Use `postMessage` API for secure cross-origin communication
+   - Validate message sources
+   - Implement proper error handling
+
+## Message Handling
+
+### Parent Window (Host Application)
+
+The parent window should:
+
+1. Set up message event listeners
+2. Validate message origins
+3. Process authenticated messages
+4. Handle error cases
+
+### Child Window (iFrame)
+
+The iFrame should:
+
+1. Communicate its authentication status
+2. Send secure tokens/credentials
+3. Handle parent window messages
+
+## Best Practices
+
+1. **Security**
+
+   - Always use HTTPS
+   - Implement proper origin checks
+   - Validate all messages
+
+2. **Error Handling**
+
+   - Implement comprehensive error handling
+   - Log authentication failures
+   - Provide user feedback
+
+3. **Performance**
+   - Minimize cross-frame communication
+   - Use efficient message formats
+   - Implement proper cleanup
+
+## Implementation Steps
+
+1. Set up event listeners in both parent and child windows
+2. Implement message validation
+3. Handle authentication flow
+4. Manage session state
+5. Clean up event listeners
+
+## Common Issues and Solutions
+
+1. **Cross-Origin Issues**
+
+   - Solution: Proper CORS configuration
+   - Use allowlisted origins
+
+2. **Message Security**
+
+   - Solution: Implement message encryption
+   - Use secure protocols
+
+3. **Session Management**
+   - Solution: Implement proper session handling
+   - Use secure storage methods

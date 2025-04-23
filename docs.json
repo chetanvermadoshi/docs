@@ -15,6 +15,10 @@
       {
         "tab": "Client API",
         "openapi": "/client.yaml"
+      },
+      {
+        "tab": "iFrame",
+        "pages": ["iframe/authentication", "iframe/code-example"]
       }
     ]
   },
