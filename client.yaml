@@ -90,6 +90,240 @@ components:
         - name
         - code
 
+    UserStreak:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: The ID of the user
+        currentStreak:
+          type: integer
+          description: The current streak count
+        lastUpdated:
+          type: string
+          format: date-time
+          description: The last time the streak was updated
+        longestStreak:
+          type: integer
+          description: The longest streak achieved by the user
+      required:
+        - userId
+        - currentStreak
+        - lastUpdated
+        - longestStreak
+
+    CreateUserStreakRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: The ID of the user
+        currentStreak:
+          type: integer
+          description: Initial streak count (defaults to 1 if not provided)
+          default: 1
+        lastUpdated:
+          type: string
+          format: date-time
+          description: The initial streak timestamp (defaults to current time if not provided)
+      required:
+        - userId
+
+    UpdateUserStreakRequest:
+      type: object
+      properties:
+        currentStreak:
+          type: integer
+          description: The new streak count
+        lastUpdated:
+          type: string
+          format: date-time
+          description: The new last updated timestamp
+        longestStreak:
+          type: integer
+          description: The new longest streak (optional, will be auto-calculated if not provided)
+      required:
+        - currentStreak
+        - lastUpdated
+
+    Badge:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the badge
+        name:
+          type: string
+          description: Name of the badge
+        action:
+          type: string
+          description: Action required to earn the badge
+        category:
+          type: string
+          description: Category of the badge
+        description:
+          type: string
+          description: Detailed description of the badge
+        imageUrl:
+          type: string
+          description: SVG image URL of the badge
+        imageUrlPng:
+          type: string
+          description: PNG image URL of the badge
+        maxDosh:
+          type: integer
+          description: Maximum Dosh reward possible
+        minDosh:
+          type: integer
+          description: Minimum Dosh reward possible
+        maxXP:
+          type: integer
+          description: Maximum XP reward possible
+        minXP:
+          type: integer
+          description: Minimum XP reward possible
+      required:
+        - id
+        - name
+        - action
+        - category
+        - description
+        - imageUrl
+        - imageUrlPng
+        - maxDosh
+        - minDosh
+        - maxXP
+        - minXP
+
+    BadgeReward:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the badge reward
+        badge:
+          $ref: "#/components/schemas/Badge"
+        badgeAction:
+          type: string
+          description: Action that triggered the badge reward
+        badgeId:
+          type: string
+          description: ID of the badge
+        claimedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the badge was claimed
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the badge reward was created
+        doshReward:
+          type: integer
+          description: Amount of Dosh rewarded
+        institutionId:
+          type: string
+          description: ID of the institution
+        metadata:
+          type: object
+          description: Additional metadata for the badge reward
+          additionalProperties: true
+        lessonId:
+          type: string
+          description: ID of the related lesson
+        lessonSubmissionId:
+          type: string
+          description: ID of the lesson submission
+        userId:
+          type: string
+          description: ID of the user who earned the badge
+        xpReward:
+          type: integer
+          description: Amount of XP rewarded
+      required:
+        - id
+        - badge
+        - badgeId
+        - claimedAt
+        - createdAt
+        - doshReward
+        - institutionId
+        - userId
+        - xpReward
+
+    Lesson:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the lesson
+        name:
+          type: string
+          description: Name of the lesson
+        pathId:
+          type: string
+          description: ID of the path this lesson belongs to
+        levelId:
+          type: string
+          description: ID of the level this lesson belongs to
+        isCustomLesson:
+          type: boolean
+          description: Whether this is a custom lesson
+          default: false
+      required:
+        - id
+        - name
+        - pathId
+        - levelId
+
+    Level:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the level
+        name:
+          type: string
+          description: Name of the level
+        lessons:
+          type: array
+          description: List of lessons in this level
+          items:
+            $ref: "#/components/schemas/Lesson"
+      required:
+        - id
+        - name
+        - lessons
+
+    Path:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the path
+        name:
+          type: string
+          description: Name of the path
+        emoji:
+          type: string
+          description: Emoji representation of the path
+        description:
+          type: string
+          description: Description of the path
+        imageUrl:
+          type: string
+          description: URL of the path's image
+        levels:
+          type: array
+          description: List of levels in this path
+          items:
+            $ref: "#/components/schemas/Level"
+      required:
+        - id
+        - name
+        - emoji
+        - description
+        - levels
+
 paths:
   /client/auth/token:
     post:
@@ -126,6 +360,176 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Institution not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /client/users/{userId}/streak:
+    get:
+      tags: [Client]
+      summary: Get user's streak information
+      description: Retrieves the current streak information for a specific user
+      security:
+        - ClientAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the user to get streak information for
+      responses:
+        "200":
+          description: Successfully retrieved user streak information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStreak"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      tags: [Client]
+      summary: Update user's streak
+      description: Updates the streak information for a specific user
+      security:
+        - ClientAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the user to update streak for
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserStreakRequest"
+      responses:
+        "200":
+          description: Streak updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStreak"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User streak not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /client/users/{userId}/badges:
+    get:
+      tags: [Client]
+      summary: Get user's badge rewards
+      description: Retrieves all badge rewards earned by a specific user
+      security:
+        - ClientAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the user to get badge rewards for
+      responses:
+        "200":
+          description: Successfully retrieved user's badge rewards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  badges:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BadgeReward"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /client/paths/{pathId}:
+    get:
+      tags: [Client]
+      summary: Get path information
+      description: Retrieves detailed information about a path including its levels and lessons
+      security:
+        - ClientAuth: []
+      parameters:
+        - name: pathId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the path to retrieve
+      responses:
+        "200":
+          description: Successfully retrieved path information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Path"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Path not found
           content:
             application/json:
               schema:

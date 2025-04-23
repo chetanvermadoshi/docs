@@ -8,16 +8,10 @@
   },
   "favicon": "/logo/logo.png",
   "colors": {
-    "primary": "#000000",
-    "light": "#000000",
-    "dark": "#000000"
+    "primary": "#000000"
   },
   "navigation": {
     "tabs": [
-      {
-        "tab": "Core API",
-        "openapi": "/core.yaml"
-      },
       {
         "tab": "Client API",
         "openapi": "/client.yaml"
