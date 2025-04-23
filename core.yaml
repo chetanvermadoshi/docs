@@ -1,0 +1,1148 @@
+openapi: 3.0.0
+info:
+  title: Doshi API
+  version: 1.0.0
+  description: |
+    API documentation for the Doshi server. This API provides endpoints for user management, 
+    marketplace operations, verification services, and streak management.
+
+    The API is focused on end-user operations through the Core API (/core/*).
+
+tags:
+  - name: Core - User Management
+    description: Endpoints for managing user accounts and profiles
+  - name: Core - Institution
+    description: Endpoints for managing institution memberships and information
+  - name: Core - Academy
+    description: Learning paths, lessons, and educational content management
+  - name: Core - Marketplace
+    description: Rewards and marketplace related operations
+  - name: Core - Verification
+    description: Phone verification and OTP management
+  - name: Core - Balance
+    description: User balance and points management
+  - name: Core - Streak
+    description: Streak and points tracking system
+
+servers:
+  - url: https://production-doshi-api-8kq2.encr.app
+    description: Production API server
+  - url: https://sandbox-doshi-api-8kq2.encr.app
+    description: Staging/Sandbox API server
+  - url: http://localhost:3000
+    description: Local development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  headers:
+    Access-Type:
+      schema:
+        type: string
+        enum: [core]
+      description: Type of access token being used
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        institutionId:
+          type: string
+      required:
+        - id
+
+    Reward:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        points:
+          type: number
+        institutionId:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - id
+        - name
+        - points
+
+    RedeemedReward:
+      type: object
+      properties:
+        id:
+          type: string
+        rewardId:
+          type: string
+        userId:
+          type: string
+        redeemedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - rewardId
+        - userId
+        - redeemedAt
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required:
+        - code
+        - message
+
+    OTPRequest:
+      type: object
+      properties:
+        phoneNumber:
+          type: string
+          description: Phone number in E.164 format
+      required:
+        - phoneNumber
+
+    OTPVerification:
+      type: object
+      properties:
+        phoneNumber:
+          type: string
+          description: Phone number in E.164 format
+        code:
+          type: string
+          description: OTP code received via SMS
+      required:
+        - phoneNumber
+        - code
+
+    StreakPoints:
+      type: object
+      properties:
+        userId:
+          type: string
+        points:
+          type: number
+        reason:
+          type: string
+      required:
+        - userId
+        - points
+
+    Institution:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - id
+        - name
+        - code
+
+    Path:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        order:
+          type: number
+        lessons:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              order:
+                type: number
+      required:
+        - id
+        - name
+        - order
+
+    Lesson:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        content:
+          type: string
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              question:
+                type: string
+              options:
+                type: array
+                items:
+                  type: string
+      required:
+        - id
+        - name
+        - content
+
+    Balance:
+      type: object
+      properties:
+        userId:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        lastUpdated:
+          type: string
+          format: date-time
+      required:
+        - userId
+        - amount
+        - currency
+
+paths:
+  /core/health:
+    get:
+      tags: [Core - User Management]
+      summary: Check API health
+      description: |
+        Simple health check endpoint to verify if the API is running and responding.
+        Used for monitoring and deployment verification.
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+
+  /core/user:
+    get:
+      tags: [Core - User Management]
+      summary: Get current user
+      description: |
+        Retrieves the profile information of the currently authenticated user.
+        This includes basic user details like email and institution association.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      responses:
+        "200":
+          description: User details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: Update user
+      description: |
+        Updates the profile information of the currently authenticated user.
+        Allows modification of user details while maintaining the same user ID.
+        Certain fields may be restricted from updates based on business rules.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        "200":
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: Delete user
+      description: |
+        Permanently deletes the currently authenticated user's account.
+        This action cannot be undone and will remove all associated data.
+        User's rewards and points history will be archived but not deleted.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      responses:
+        "200":
+          description: User deleted successfully
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/user/create:
+    post:
+      tags: [Core - User Management]
+      summary: Create new user
+      description: |
+        Creates a new user account in the system.
+        Requires authentication to prevent unauthorized account creation.
+        The user will be associated with the institution specified in the request.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/marketplace/rewards:
+    get:
+      tags: [Core - Marketplace]
+      summary: Get available rewards
+      description: |
+        Retrieves a list of all available rewards that can be redeemed by the user.
+        Results are filtered based on the user's institution and active status.
+        Rewards that are inactive or not available for the user's institution are excluded.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      responses:
+        "200":
+          description: List of available rewards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reward"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/marketplace/rewards/redeem:
+    post:
+      tags: [Core - Marketplace]
+      summary: Redeem a reward
+      description: |
+        Allows a user to redeem a specific reward using their accumulated points.
+        Validates if the user has sufficient points and if the reward is still available.
+        Points are deducted automatically upon successful redemption.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rewardId:
+                  type: string
+              required:
+                - rewardId
+      responses:
+        "200":
+          description: Reward redeemed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemedReward"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Reward not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "400":
+          description: Insufficient points or other validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/marketplace/rewards/redeemed:
+    get:
+      tags: [Core - Marketplace]
+      summary: Get user's redeemed rewards
+      description: |
+        Retrieves the history of rewards redeemed by the current user.
+        Includes details about when each reward was redeemed and its status.
+        Useful for tracking reward redemption history and current reward status.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      responses:
+        "200":
+          description: List of redeemed rewards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RedeemedReward"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/verification/send-otp:
+    post:
+      tags: [Core - Verification]
+      summary: Send OTP to phone number
+      description: |
+        Initiates the phone number verification process by sending an OTP.
+        The OTP is sent via SMS to the provided phone number.
+        Implements rate limiting to prevent abuse of the verification system.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OTPRequest"
+      responses:
+        "200":
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        "400":
+          description: Invalid phone number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/verification/verify-otp:
+    post:
+      tags: [Core - Verification]
+      summary: Verify OTP code
+      description: |
+        Validates the OTP code sent to the user's phone number.
+        Must be called after a successful send-otp request.
+        Successfully verified phone numbers are marked as trusted in the system.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OTPVerification"
+      responses:
+        "200":
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  verified:
+                    type: boolean
+        "400":
+          description: Invalid code or phone number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No pending verification found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/streak/points:
+    post:
+      tags: [Core - Streak]
+      summary: Assign streak points to user
+      description: |
+        Awards points to a user based on their streak activities.
+        Points are calculated based on the streak length and activity type.
+        Updates the user's total points and maintains streak history.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StreakPoints"
+      responses:
+        "200":
+          description: Points assigned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  points:
+                    type: number
+                  totalPoints:
+                    type: number
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/institution:
+    get:
+      tags: [Core - Institution]
+      summary: Get user's institution
+      description: |
+        Retrieves detailed information about the institution 
+        that the current user belongs to.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      responses:
+        "200":
+          description: Institution details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Institution"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Institution not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/institution/join:
+    post:
+      tags: [Core - Institution]
+      summary: Join an institution
+      description: |
+        Allows a user to join an institution using an institution code.
+        Updates user's institution association and related permissions.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+              required:
+                - code
+      responses:
+        "200":
+          description: Successfully joined institution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Institution"
+        "400":
+          description: Invalid institution code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/institution/code/{code}:
+    get:
+      tags: [Core - Institution]
+      summary: Get institution by code
+      description: |
+        Retrieves institution details using an institution code.
+        Used to verify institution existence before joining.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+        - in: path
+          name: code
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Institution found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Institution"
+        "404":
+          description: Institution not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/academy/paths:
+    get:
+      tags: [Core - Academy]
+      summary: Get all learning paths
+      description: |
+        Retrieves all available learning paths for the user's institution.
+        Paths are ordered by their defined sequence.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      responses:
+        "200":
+          description: Learning paths retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Path"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/academy/path/current:
+    get:
+      tags: [Core - Academy]
+      summary: Get user's current path
+      description: |
+        Retrieves the learning path that the user is currently working on.
+        Includes progress information and next available lessons.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      responses:
+        "200":
+          description: Current path retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Path"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No current path found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/academy/lesson/{lessonId}:
+    get:
+      tags: [Core - Academy]
+      summary: Get lesson details
+      description: |
+        Retrieves detailed information about a specific lesson.
+        Includes lesson content, questions, and user's progress.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+        - in: path
+          name: lessonId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lesson details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lesson"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/academy/lesson/submit:
+    post:
+      tags: [Core - Academy]
+      summary: Submit lesson completion
+      description: |
+        Marks a lesson as completed and updates user's progress.
+        Awards points and updates streak if applicable.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lessonId:
+                  type: string
+                timeSpent:
+                  type: number
+              required:
+                - lessonId
+      responses:
+        "200":
+          description: Lesson submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  points:
+                    type: number
+                  streakUpdated:
+                    type: boolean
+        "400":
+          description: Invalid submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/academy/question/submit:
+    post:
+      tags: [Core - Academy]
+      summary: Submit question answer
+      description: |
+        Submits an answer to a lesson question and checks correctness.
+        Updates progress and may affect lives if answer is incorrect.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                questionId:
+                  type: string
+                answer:
+                  type: string
+              required:
+                - questionId
+                - answer
+      responses:
+        "200":
+          description: Answer submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  correct:
+                    type: boolean
+                  feedback:
+                    type: string
+                  livesRemaining:
+                    type: number
+        "400":
+          description: Invalid submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/academy/lives/buy:
+    post:
+      tags: [Core - Academy]
+      summary: Buy additional lives
+      description: |
+        Purchases additional lives using user's balance.
+        Required to continue learning after running out of lives.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+              required:
+                - amount
+      responses:
+        "200":
+          description: Lives purchased successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  livesAdded:
+                    type: number
+                  currentLives:
+                    type: number
+                  balanceRemaining:
+                    type: number
+        "400":
+          description: Insufficient balance or invalid amount
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/balance:
+    get:
+      tags: [Core - Balance]
+      summary: Get user's balance
+      description: |
+        Retrieves the current balance for the authenticated user.
+        Includes transaction history and currency information.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      responses:
+        "200":
+          description: Balance retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Balance"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Balance not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /core/balance/update:
+    post:
+      tags: [Core - Balance]
+      summary: Update user's balance
+      description: |
+        Updates the user's balance based on various activities.
+        Can be used for both crediting and debiting points.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: Access-Type
+          schema:
+            type: string
+            default: core
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                reason:
+                  type: string
+              required:
+                - amount
+                - reason
+      responses:
+        "200":
+          description: Balance updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Balance"
+        "400":
+          description: Invalid update request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

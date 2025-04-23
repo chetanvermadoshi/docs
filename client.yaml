@@ -1,0 +1,132 @@
+openapi: 3.0.0
+info:
+  title: Doshi API
+  version: 1.0.0
+  description: |
+    API documentation for the Doshi server. This API provides endpoints for client authentication
+    and institution operations.
+
+    The API is focused on client operations:
+    - Client API (/client/*): For institution/client operations
+
+tags:
+  - name: Client
+    description: Institution/client specific operations including authentication
+
+servers:
+  - url: https://production-doshi-api-8kq2.encr.app
+    description: Production API server
+  - url: https://sandbox-doshi-api-8kq2.encr.app
+    description: Staging/Sandbox API server
+  - url: http://localhost:3000
+    description: Local development server
+
+components:
+  securitySchemes:
+    ClientAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  headers:
+    Access-Type:
+      schema:
+        type: string
+        enum: [client]
+      description: Type of access token being used
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required:
+        - code
+        - message
+
+    ClientAuthRequest:
+      type: object
+      properties:
+        institutionId:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+      required:
+        - institutionId
+        - clientId
+        - clientSecret
+
+    ClientAuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresIn:
+          type: number
+      required:
+        - token
+        - expiresIn
+
+    Institution:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - id
+        - name
+        - code
+
+paths:
+  /client/auth/token:
+    post:
+      tags: [Client]
+      summary: Get client authentication token
+      description: |
+        Authenticates an institution/client and provides an access token.
+        Requires valid client credentials (client ID and secret).
+        The token can be used to access client-specific endpoints and services.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientAuthRequest"
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientAuthResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Institution not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
