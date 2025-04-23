@@ -112,6 +112,57 @@ components:
         - lastUpdated
         - longestStreak
 
+    UserBalance:
+      type: object
+      properties:
+        doshBalance:
+          type: number
+          format: float
+          description: User's Dosh balance
+        emoji:
+          type: string
+          nullable: true
+          description: User's emoji
+        institutionId:
+          type: string
+          description: ID of the institution
+        lifeBalance:
+          type: number
+          format: float
+          description: User's Life balance
+        userId:
+          type: string
+          description: ID of the user
+        userName:
+          type: string
+          nullable: true
+          description: Name of the user
+        xpBalance:
+          type: number
+          format: float
+          description: User's XP balance
+        lifeUpdatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when life balance was last updated
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the balance record was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the balance record was last updated
+      required:
+        - doshBalance
+        - institutionId
+        - lifeBalance
+        - userId
+        - xpBalance
+        - createdAt
+        - updatedAt
+
     CreateUserStreakRequest:
       type: object
       properties:
@@ -324,6 +375,304 @@ components:
         - description
         - levels
 
+    SlideChoice:
+      type: object
+      properties:
+        content:
+          type: string
+        isRightAnswer:
+          type: boolean
+      required:
+        - content
+        - isRightAnswer
+
+    SlideMatchPair:
+      type: object
+      properties:
+        term:
+          type: string
+        definition:
+          type: string
+      required:
+        - term
+        - definition
+
+    SlideLottie:
+      type: object
+      properties:
+        startFrame:
+          type: number
+          nullable: true
+        url:
+          type: string
+        totalFrames:
+          type: number
+          nullable: true
+        endFrame:
+          type: number
+          nullable: true
+      required:
+        - url
+
+    SlideContent:
+      type: object
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        lottieAsset:
+          type: object
+          nullable: true
+          properties:
+            startFrame:
+              type: number
+              nullable: true
+            url:
+              type: string
+            totalFrames:
+              type: number
+              nullable: true
+            endFrame:
+              type: number
+              nullable: true
+          required:
+            - url
+        blurb:
+          type: string
+          nullable: true
+        mediaUrl:
+          type: string
+          nullable: true
+        isSurvey:
+          type: boolean
+          nullable: true
+        choices:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/SlideChoice"
+        matchPairs:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/SlideMatchPair"
+        value:
+          oneOf:
+            - type: number
+            - type: boolean
+        type:
+          type: string
+          enum:
+            - video
+            - text
+            - choice
+            - open
+            - open_multiline
+            - number
+            - currency
+            - match
+            - bool
+            - slider
+      required:
+        - id
+        - content
+        - type
+
+    LessonResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        emoji:
+          type: string
+          nullable: true
+        lessonTitle:
+          type: string
+        pathId:
+          type: string
+        levelId:
+          type: string
+        slides:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              content:
+                type: string
+              lottieAsset:
+                type: object
+                nullable: true
+                properties:
+                  startFrame:
+                    type: number
+                    nullable: true
+                  url:
+                    type: string
+                  totalFrames:
+                    type: number
+                    nullable: true
+                  endFrame:
+                    type: number
+                    nullable: true
+                required:
+                  - url
+              blurb:
+                type: string
+                nullable: true
+              mediaUrl:
+                type: string
+                nullable: true
+              isSurvey:
+                type: boolean
+                nullable: true
+              choices:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  properties:
+                    content:
+                      type: string
+                    isRightAnswer:
+                      type: boolean
+                  required:
+                    - content
+                    - isRightAnswer
+              matchPairs:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  properties:
+                    term:
+                      type: string
+                    definition:
+                      type: string
+                  required:
+                    - term
+                    - definition
+              value:
+                nullable: true
+                oneOf:
+                  - type: number
+                  - type: boolean
+              type:
+                type: string
+                enum:
+                  - video
+                  - text
+                  - choice
+                  - open
+                  - open_multiline
+                  - number
+                  - currency
+                  - match
+                  - bool
+                  - slider
+            required:
+              - id
+              - content
+              - type
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              content:
+                type: string
+              lottieAsset:
+                type: object
+                nullable: true
+                properties:
+                  startFrame:
+                    type: number
+                    nullable: true
+                  url:
+                    type: string
+                  totalFrames:
+                    type: number
+                    nullable: true
+                  endFrame:
+                    type: number
+                    nullable: true
+                required:
+                  - url
+              blurb:
+                type: string
+                nullable: true
+              mediaUrl:
+                type: string
+                nullable: true
+              isSurvey:
+                type: boolean
+                nullable: true
+              choices:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  properties:
+                    content:
+                      type: string
+                    isRightAnswer:
+                      type: boolean
+                  required:
+                    - content
+                    - isRightAnswer
+              matchPairs:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  properties:
+                    term:
+                      type: string
+                    definition:
+                      type: string
+                  required:
+                    - term
+                    - definition
+              value:
+                nullable: true
+                oneOf:
+                  - type: number
+                  - type: boolean
+              type:
+                type: string
+                enum:
+                  - video
+                  - text
+                  - choice
+                  - open
+                  - open_multiline
+                  - number
+                  - currency
+                  - match
+                  - bool
+                  - slider
+            required:
+              - id
+              - content
+              - type
+        isInteractive:
+          type: boolean
+        lessonSubmissionId:
+          type: string
+          nullable: true
+      required:
+        - id
+        - lessonTitle
+        - pathId
+        - levelId
+        - slides
+        - questions
+        - isInteractive
+
 paths:
   /client/auth/token:
     post:
@@ -495,6 +844,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /client/users/{userId}/balance:
+    get:
+      tags: [Client]
+      summary: Get user's balance information
+      description: Retrieves the current balance information including Dosh, Life, and XP for a specific user
+      security:
+        - ClientAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the user to get balance information for
+      responses:
+        "200":
+          description: Successfully retrieved user balance information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserBalance"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /client/paths/{pathId}:
     get:
       tags: [Client]
@@ -530,6 +919,46 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Path not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /client/lessons/{lessonId}:
+    get:
+      tags: [Client]
+      summary: Get detailed lesson information
+      description: Retrieves detailed information about a lesson including its slides and questions
+      security:
+        - ClientAuth: []
+      parameters:
+        - name: lessonId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the lesson to retrieve
+      responses:
+        "200":
+          description: Successfully retrieved lesson information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Lesson not found
           content:
             application/json:
               schema:
