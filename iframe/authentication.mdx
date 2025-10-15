@@ -7,11 +7,9 @@ This guide explains how to implement secure iframe-based authentication in web a
 ## Security Considerations
 
 1. **Origin Verification**
-
    - Always verify the origin of messages received from the iFrame
    - Implement proper message validation
    - Use HTTPS for secure communication
-
 2. **Cross-Origin Communication**
    - Use `postMessage` API for secure cross-origin communication
    - Validate message sources
@@ -39,17 +37,13 @@ The iFrame should:
 ## Best Practices
 
 1. **Security**
-
    - Always use HTTPS
    - Implement proper origin checks
    - Validate all messages
-
 2. **Error Handling**
-
    - Implement comprehensive error handling
    - Log authentication failures
    - Provide user feedback
-
 3. **Performance**
    - Minimize cross-frame communication
    - Use efficient message formats
@@ -66,15 +60,11 @@ The iFrame should:
 ## Common Issues and Solutions
 
 1. **Cross-Origin Issues**
-
    - Solution: Proper CORS configuration
    - Use allowlisted origins
-
 2. **Message Security**
-
    - Solution: Implement message encryption
    - Use secure protocols
-
 3. **Session Management**
    - Solution: Implement proper session handling
    - Use secure storage methods

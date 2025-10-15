@@ -18,7 +18,16 @@
       },
       {
         "tab": "iFrame",
-        "pages": ["iframe/authentication", "iframe/code-example"]
+        "pages": [
+          "iframe/authentication",
+          "iframe/code-example"
+        ]
+      },
+      {
+        "tab": "Webview",
+        "pages": [
+          "webview/authentication"
+        ]
       }
     ]
   },
