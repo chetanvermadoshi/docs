@@ -1,0 +1,82 @@
+---
+title: "Webview Authentication Overview"
+description: "Learn how to implement secure webview-based authentication in your web application"
+---
+
+## Introduction
+
+This guide explains how to implement secure webview-based authentication in web applications, specifically focusing on parent-child window communication. We support two main methods:
+
+1. **postMessage API** - Real-time, secure cross-origin communication
+2. **Query Parameters** - Simple, stateless authentication
+
+## When to Use Each Method
+
+<CardGroup cols={2}>
+  <Card title="postMessage API" icon="message" href="/webview/postmessage">
+    Best for real-time communication, sensitive data, and dynamic authentication flows
+  </Card>
+  <Card title="Query Parameters" icon="link" href="/webview/query-parameters">
+    Best for simple, one-time authentication and easier debugging
+  </Card>
+</CardGroup>
+
+## Authentication Data Structure
+
+All authentication methods use the following data structure:
+```typescript
+interface AuthData {
+  token: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  partnerUserId: string;
+  pathId: string;
+  segment: string;
+  branchId: string;
+}
+```
+
+## Quick Start
+
+<Steps>
+  <Step title="Choose Your Method">
+    Select either postMessage or query parameters based on your security requirements
+  </Step>
+  <Step title="Review Security Guidelines">
+    Read our [security considerations](/webview/security) before implementation
+  </Step>
+  <Step title="Implement Authentication">
+    Follow the guides for [postMessage](/webview/postmessage) or [query parameters](/webview/query-parameters)
+  </Step>
+  <Step title="Follow Best Practices">
+    Review [best practices](/webview/best-practices) and [troubleshooting](/webview/troubleshooting)
+  </Step>
+</Steps>
+
+## Basic Webview Setup
+```tsx
+<iframe
+  src="https://embed.doshi.app"
+  className="h-full w-full"
+  frameBorder="0"
+  allowFullScreen
+/>
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Security Guidelines" icon="shield" href="/webview/security">
+    Learn about security best practices
+  </Card>
+  <Card title="postMessage Method" icon="message" href="/webview/postmessage">
+    Implement secure real-time authentication
+  </Card>
+  <Card title="Query Parameters" icon="link" href="/webview/query-parameters">
+    Use URL-based authentication
+  </Card>
+  <Card title="Best Practices" icon="star" href="/webview/best-practices">
+    Optimize your implementation
+  </Card>
+</CardGroup>

@@ -17,16 +17,14 @@
         "openapi": "/client.json"
       },
       {
-        "tab": "iFrame",
-        "pages": [
-          "iframe/authentication",
-          "iframe/code-example"
-        ]
-      },
-      {
         "tab": "Webview",
-        "pages": [
-          "webview/authentication"
+         "pages": [
+          "webview/introduction",
+          "webview/security",
+          "webview/postmessage",
+          "webview/query-parameters",
+          "webview/best-practices",
+          "webview/troubleshooting"
         ]
       }
     ]

@@ -1,0 +1,513 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions for webview authentication"
+---
+
+## Common Issues
+
+### Cross-Origin Issues
+
+<AccordionGroup>
+  <Accordion title="Messages not being received">
+    **Problem:** The webview is not receiving messages from the parent window.
+
+    **Solutions:**
+
+    1. **Check origin validation:**
+```javascript
+    // Make sure origins match
+    window.addEventListener("message", (event) => {
+      console.log('Received from:', event.origin);
+      // Temporarily comment out origin check for debugging
+      // if (event.origin !== 'https://embed.doshi.app') return;
+    });
+```
+
+    2. **Verify iframe is loaded:**
+```javascript
+    const iframe = document.querySelector('iframe');
+    iframe.addEventListener('load', () => {
+      console.log('Iframe loaded');
+      // Try sending message after load
+    });
+```
+
+    3. **Check for proper JSON parsing:**
+```javascript
+    try {
+      const data = typeof event.data === "string" 
+        ? JSON.parse(event.data) 
+        : event.data;
+      console.log('Parsed data:', data);
+    } catch (error) {
+      console.error('Failed to parse:', event.data, error);
+    }
+```
+  </Accordion>
+
+  <Accordion title="CORS errors in console">
+    **Problem:** Browser console shows CORS-related errors.
+
+    **Solutions:**
+
+    1. **Ensure HTTPS is used:**
+```javascript
+    // ✅ Use HTTPS
+    const url = "https://embed.doshi.app";
+    
+    // ❌ Don't use HTTP or mixed content
+    const badUrl = "http://embed.doshi.app";
+```
+
+    2. **Configure proper CORS headers (server-side):**
+```javascript
+    // Server should include these headers
+    Access-Control-Allow-Origin: https://your-domain.com
+    Access-Control-Allow-Methods: GET, POST
+    Access-Control-Allow-Headers: Content-Type
+```
+
+    3. **Use postMessage instead of direct access:**
+```javascript
+    // ✅ Use postMessage
+    iframe.contentWindow.postMessage(data, origin);
+    
+    // ❌ Don't try to access cross-origin properties directly
+    // iframe.contentWindow.document // This will fail
+```
+  </Accordion>
+
+  <Accordion title="Origin verification failing">
+    **Problem:** Messages are being rejected due to origin mismatch.
+
+    **Solutions:**
+
+    1. **Log actual origins:**
+```javascript
+    window.addEventListener("message", (event) => {
+      console.log('Expected:', 'https://embed.doshi.app');
+      console.log('Received:', event.origin);
+      
+      if (event.origin !== 'https://embed.doshi.app') {
+        console.warn('Origin mismatch!');
+        return;
+      }
+    });
+```
+
+    2. **Check for trailing slashes:**
+```javascript
+    // Normalize origin comparison
+    const normalizeOrigin = (origin) => origin.replace(/\/$/, '');
+    
+    if (normalizeOrigin(event.origin) !== normalizeOrigin(expectedOrigin)) {
+      return;
+    }
+```
+
+    3. **Handle subdomain variations:**
+```javascript
+    const allowedOrigins = [
+      'https://embed.doshi.app',
+      'https://staging-embed.doshi.app'
+    ];
+    
+    if (!allowedOrigins.includes(event.origin)) {
+      return;
+    }
+```
+  </Accordion>
+</AccordionGroup>
+
+### Message Security Issues
+
+<AccordionGroup>
+  <Accordion title="Messages from wrong origin">
+    **Problem:** Receiving messages from unexpected origins.
+
+    **Solution:**
+```javascript
+    window.addEventListener("message", (event) => {
+      // Whitelist approach
+      const allowedOrigins = [
+        'https://embed.doshi.app',
+        'https://your-domain.com'
+      ];
+      
+      if (!allowedOrigins.includes(event.origin)) {
+        console.warn('Rejected message from:', event.origin);
+        return;
+      }
+      
+      // Process message
+    });
+```
+  </Accordion>
+
+  <Accordion title="Invalid message format">
+    **Problem:** Messages are not in the expected format.
+
+    **Solution:**
+```javascript
+    function validateMessage(data) {
+      // Check required fields
+      if (!data.type) {
+        throw new Error('Message missing type field');
+      }
+      
+      // Validate message type
+      const validTypes = ['PING', 'AUTH', 'ERROR'];
+      if (!validTypes.includes(data.type)) {
+        throw new Error(`Invalid message type: ${data.type}`);
+      }
+      
+      // Type-specific validation
+      if (data.type === 'AUTH') {
+        if (!data.token || !data.email) {
+          throw new Error('AUTH message missing required fields');
+        }
+      }
+      
+      return true;
+    }
+
+    window.addEventListener("message", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        validateMessage(data);
+        // Process valid message
+      } catch (error) {
+        console.error('Message validation failed:', error);
+      }
+    });
+```
+  </Accordion>
+</AccordionGroup>
+
+### Query Parameter Issues
+
+<AccordionGroup>
+  <Accordion title="URL too long">
+    **Problem:** URL exceeds browser limits (typically 2000 characters).
+
+    **Solutions:**
+
+    1. **Use shorter tokens:**
+```javascript
+    // Instead of full JWT, use a short reference
+    const shortToken = generateShortToken(userId); // e.g., "abc123"
+    // Look up full auth data server-side
+```
+
+    2. **Switch to postMessage:**
+```javascript
+    // If data is too large, use postMessage instead
+    if (url.length > 2000) {
+      console.warn('URL too long, using postMessage');
+      usePostMessageAuth();
+    }
+```
+
+    3. **Compress data:**
+```javascript
+    // Only send essential fields
+    const essentialData = {
+      token: authData.token,
+      email: authData.email
+      // Fetch other data from API after auth
+    };
+```
+  </Accordion>
+
+  <Accordion title="Special characters not encoding properly">
+    **Problem:** Special characters in parameters are causing issues.
+
+    **Solution:**
+```javascript
+    // Use URLSearchParams for automatic encoding
+    const params = new URLSearchParams();
+    params.append('email', 'user+test@example.com'); // Properly encoded
+    params.append('name', 'John & Jane'); // Properly encoded
+    
+    const url = `https://embed.doshi.app?${params.toString()}`;
+    
+    // Manual encoding if needed
+    const encoded = encodeURIComponent('special@chars#here');
+```
+  </Accordion>
+
+  <Accordion title="Parameters not being read">
+    **Problem:** Query parameters are not accessible in the webview.
+
+    **Solution:**
+```javascript
+    // Debug parameter reading
+    console.log('Current URL:', window.location.href);
+    console.log('Search params:', window.location.search);
+    
+    const params = new URLSearchParams(window.location.search);
+    console.log('All params:', Object.fromEntries(params));
+    
+    // Check for specific param
+    const token = params.get('token');
+    console.log('Token:', token);
+    
+    if (!token) {
+      console.error('Token parameter missing from URL');
+    }
+```
+  </Accordion>
+</AccordionGroup>
+
+### Sensitive Data Exposure
+
+<AccordionGroup>
+  <Accordion title="Tokens visible in browser history">
+    **Problem:** Sensitive tokens remain in browser history.
+
+    **Solution:**
+```javascript
+    // Clear URL after reading parameters
+    function clearSensitiveParams() {
+      const authData = extractAuthData();
+      
+      // Store in session/memory
+      sessionStorage.setItem('authData', JSON.stringify(authData));
+      
+      // Clear URL
+      if (window.history.replaceState) {
+        const url = new URL(window.location.href);
+        url.search = '';
+        window.history.replaceState({}, document.title, url.toString());
+      }
+    }
+
+    // Call immediately after reading
+    clearSensitiveParams();
+```
+  </Accordion>
+
+  <Accordion title="Tokens exposed in logs">
+    **Problem:** Authentication tokens appearing in error logs.
+
+    **Solution:**
+```javascript
+    // Sanitize data before logging
+    function sanitizeForLogging(data) {
+      const sanitized = { ...data };
+      
+      // Mask sensitive fields
+      if (sanitized.token) {
+        sanitized.token = sanitized.token.slice(0, 8) + '...';
+      }
+      
+      if (sanitized.email) {
+        const [local, domain] = sanitized.email.split('@');
+        sanitized.email = local[0] + '***@' + domain;
+      }
+      
+      return sanitized;
+    }
+
+    // Use when logging
+    console.log('Auth data:', sanitizeForLogging(authData));
+```
+  </Accordion>
+</AccordionGroup>
+
+### Browser Compatibility
+
+<AccordionGroup>
+  <Accordion title="postMessage not working in older browsers">
+    **Problem:** postMessage API not supported.
+
+    **Solution:**
+```javascript
+    // Check for support
+    if (typeof window.postMessage === 'undefined') {
+      console.error('postMessage not supported');
+      // Fallback to query parameters
+      useQueryParamAuth();
+    } else {
+      // Use postMessage
+      usePostMessageAuth();
+    }
+```
+  </Accordion>
+
+  <Accordion title="URLSearchParams not available">
+    **Problem:** URLSearchParams not supported in older browsers.
+
+    **Solution:**
+```javascript
+    // Polyfill or manual parsing
+    function getQueryParams() {
+      if (typeof URLSearchParams !== 'undefined') {
+        return new URLSearchParams(window.location.search);
+      }
+      
+      // Manual parsing fallback
+      const params = {};
+      const search = window.location.search.substring(1);
+      const pairs = search.split('&');
+      
+      pairs.forEach(pair => {
+        const [key, value] = pair.split('=');
+        if (key) {
+          params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+        }
+      });
+      
+      return {
+        get: (key) => params[key] || null
+      };
+    }
+```
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Tools
+
+### Console Debugging
+```javascript
+// Enable verbose logging
+const DEBUG = true;
+
+function debugLog(...args) {
+  if (DEBUG) {
+    console.log('[Webview Auth]', ...args);
+  }
+}
+
+// Use throughout code
+debugLog('Sending PING to parent');
+debugLog('Received message:', event.data);
+debugLog('Auth data:', sanitizeForLogging(authData));
+```
+
+### Message Inspector
+```javascript
+// Log all messages for debugging
+window.addEventListener("message", (event) => {
+  console.group('📨 Message Received');
+  console.log('Origin:', event.origin);
+  console.log('Data:', event.data);
+  console.log('Timestamp:', new Date().toISOString());
+  console.groupEnd();
+}, true); // Use capture phase to see all messages
+```
+
+### Network Monitor
+```javascript
+// Monitor iframe loading
+const iframe = document.querySelector('iframe');
+
+iframe.addEventListener('load', () => {
+  console.log('✅ Iframe loaded successfully');
+});
+
+iframe.addEventListener('error', () => {
+  console.error('❌ Iframe failed to load');
+});
+```
+
+## Performance Issues
+
+<AccordionGroup>
+  <Accordion title="Slow authentication">
+    **Problem:** Authentication takes too long.
+
+    **Solutions:**
+
+    1. **Add timeout:**
+```javascript
+    const AUTH_TIMEOUT = 5000; // 5 seconds
+    
+    const authWithTimeout = Promise.race([
+      waitForAuth(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), AUTH_TIMEOUT)
+      )
+    ]);
+```
+
+    2. **Preload iframe:**
+```javascript
+    // Start loading iframe early
+    useEffect(() => {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'document';
+      link.href = 'https://embed.doshi.app';
+      document.head.appendChild(link);
+    }, []);
+```
+
+    3. **Optimize message size:**
+```javascript
+    // Only send necessary data
+    const minimalAuth = {
+      t: authData.token, // Shortened keys
+      e: authData.email,
+      type: 'AUTH'
+    };
+```
+  </Accordion>
+
+  <Accordion title="Memory leaks">
+    **Problem:** Event listeners not being cleaned up.
+
+    **Solution:**
+```typescript
+    useEffect(() => {
+      const handleMessage = (event: MessageEvent) => {
+        // Handle message
+      };
+
+      window.addEventListener("message", handleMessage);
+
+      // ✅ Always cleanup
+      return () => {
+        window.removeEventListener("message", handleMessage);
+      };
+    }, []); // Empty deps to run once
+```
+  </Accordion>
+</AccordionGroup>
+
+## Testing Checklist
+
+<Check>Test with origin validation enabled</Check>
+<Check>Test with origin validation disabled (debug mode)</Check>
+<Check>Test authentication timeout scenarios</Check>
+<Check>Test with invalid/malformed messages</Check>
+<Check>Test with missing required fields</Check>
+<Check>Test URL parameter encoding</Check>
+<Check>Test in incognito/private browsing mode</Check>
+<Check>Test across different browsers (Chrome, Firefox, Safari, Edge)</Check>
+<Check>Test on mobile devices</Check>
+<Check>Test with slow network conditions</Check>
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Support Email" icon="envelope" href="mailto:hello@doshi.app">
+    Contact our support team
+  </Card>
+  <Card title="Best Practices" icon="star" href="/webview/best-practices">
+    Review implementation guidelines
+  </Card>
+</CardGroup>
+
+## Quick Fixes
+
+| Issue | Quick Fix |
+|-------|-----------|
+| Messages not received | Check `event.origin` validation |
+| Parameters not working | Verify URLSearchParams usage |
+| CORS errors | Ensure HTTPS is used everywhere |
+| Authentication timeout | Add retry logic with exponential backoff |
+| URL too long | Switch to postMessage method |
+| Memory leaks | Add event listener cleanup |
+| Special characters | Use URLSearchParams for encoding |
+| Browser compatibility | Add polyfills or fallbacks |

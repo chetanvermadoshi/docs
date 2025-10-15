@@ -1,0 +1,395 @@
+---
+title: "Query Parameter Authentication"
+description: "Implement simple URL-based authentication using query parameters"
+---
+
+## Overview
+
+Query parameter authentication is a simpler approach that passes authentication data through the URL. This method is ideal for stateless authentication and debugging.
+
+<Warning>
+  Query parameters are visible in URLs and browser history. Use with caution for sensitive data or implement additional security measures.
+</Warning>
+
+## How It Works
+
+<Steps>
+  <Step title="Build URL">
+    Construct the webview URL with authentication data as query parameters
+  </Step>
+  <Step title="Load Webview">
+    Load the iframe with the constructed URL
+  </Step>
+  <Step title="Extract Parameters">
+    Webview extracts and validates query parameters on load
+  </Step>
+  <Step title="Clear URL (Optional)">
+    Optionally clear sensitive parameters from the URL after reading
+  </Step>
+</Steps>
+
+## React Implementation
+
+### Basic Implementation
+```tsx
+import React, { useMemo } from "react";
+
+interface AuthData {
+  token: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  partnerUserId: string;
+  pathId: string;
+  segment: string;
+  branchId: string;
+}
+
+interface Props {
+  authData: AuthData;
+}
+
+const WebviewWithQueryParams: React.FC<Props> = ({ authData }) => {
+  // Build URL with query parameters
+  const webviewUrl = useMemo(() => {
+    const baseUrl = "https://embed.doshi.app";
+    const params = new URLSearchParams();
+    
+    // Add non-empty auth data to query params
+    Object.entries(authData).forEach(([key, value]) => {
+      if (value) {
+        params.append(key, value);
+      }
+    });
+    
+    return `${baseUrl}?${params.toString()}`;
+  }, [authData]);
+
+  return (
+    <div className="webview-container">
+      <iframe
+        src={webviewUrl}
+        className="h-full w-full"
+        frameBorder="0"
+        allowFullScreen
+      />
+    </div>
+  );
+};
+
+export default WebviewWithQueryParams;
+```
+
+### Usage Example
+```tsx
+import WebviewWithQueryParams from './WebviewWithQueryParams';
+
+function App() {
+  const authData = {
+    token: "user_token_123",
+    email: "user@example.com",
+    firstName: "John",
+    lastName: "Doe",
+    partnerUserId: "partner_123",
+    pathId: "path_456",
+    segment: "premium",
+    branchId: "branch_789",
+  };
+
+  return (
+    <div className="app">
+      <h1>My Application</h1>
+      <WebviewWithQueryParams authData={authData} />
+    </div>
+  );
+}
+```
+
+## Vanilla JavaScript Implementation
+
+### Parent Window
+```javascript
+// Define your auth data
+const authData = {
+  token: "user_token_123",
+  email: "user@example.com",
+  firstName: "John",
+  lastName: "Doe",
+  partnerUserId: "partner_123",
+  pathId: "path_456",
+  segment: "premium",
+  branchId: "branch_789",
+};
+
+// Build URL with query parameters
+function buildWebviewUrl(baseUrl, data) {
+  const params = new URLSearchParams();
+  
+  // Add non-empty values to query params
+  Object.entries(data).forEach(([key, value]) => {
+    if (value) {
+      params.append(key, value);
+    }
+  });
+  
+  return `${baseUrl}?${params.toString()}`;
+}
+
+// Create and add webview to the page
+const webview = document.createElement("iframe");
+webview.src = buildWebviewUrl("https://embed.doshi.app", authData);
+webview.className = "h-full w-full";
+webview.frameBorder = "0";
+webview.allowFullscreen = true;
+
+document.querySelector("#your-container-id").appendChild(webview);
+```
+
+## Child Window (Webview) Implementation
+
+### Reading Query Parameters
+```javascript
+// Inside the webview, extract query parameters
+function getAuthDataFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  
+  return {
+    token: params.get('token') || '',
+    email: params.get('email') || '',
+    firstName: params.get('firstName') || '',
+    lastName: params.get('lastName') || '',
+    partnerUserId: params.get('partnerUserId') || '',
+    pathId: params.get('pathId') || '',
+    segment: params.get('segment') || '',
+    branchId: params.get('branchId') || '',
+  };
+}
+
+// Use the auth data
+const authData = getAuthDataFromUrl();
+console.log('Authenticated user:', authData.email);
+
+// Validate data
+if (!authData.token || !authData.email) {
+  console.error('Missing required authentication data');
+  // Handle authentication failure
+}
+```
+
+### Clearing Sensitive Parameters
+
+<Tip>
+  Clear sensitive parameters from the URL after reading to prevent exposure in browser history
+</Tip>
+```javascript
+// Clear sensitive params from URL after reading
+function clearUrlParams() {
+  if (window.history.replaceState) {
+    const url = new URL(window.location.href);
+    url.search = ''; // Clear all query params
+    window.history.replaceState({}, document.title, url.toString());
+  }
+}
+
+// Extract auth data
+const authData = getAuthDataFromUrl();
+
+// Store in memory or secure storage
+sessionStorage.setItem('authToken', authData.token);
+
+// Clear URL
+clearUrlParams();
+```
+
+## Advanced: Selective Parameter Clearing
+
+Clear only sensitive parameters while keeping others:
+```javascript
+function clearSensitiveParams(sensitiveKeys = ['token', 'password']) {
+  if (window.history.replaceState) {
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams(url.search);
+    
+    // Remove sensitive parameters
+    sensitiveKeys.forEach(key => params.delete(key));
+    
+    // Update URL with remaining params
+    url.search = params.toString();
+    window.history.replaceState({}, document.title, url.toString());
+  }
+}
+
+// Example: Keep non-sensitive params like pathId and segment
+clearSensitiveParams(['token', 'email', 'firstName', 'lastName', 'partnerUserId']);
+```
+
+## URL Encoding
+
+Properly encode special characters in parameters:
+```javascript
+function buildSecureUrl(baseUrl, data) {
+  const params = new URLSearchParams();
+  
+  Object.entries(data).forEach(([key, value]) => {
+    if (value) {
+      // URLSearchParams automatically encodes values
+      params.append(key, value);
+    }
+  });
+  
+  const url = `${baseUrl}?${params.toString()}`;
+  
+  // Check URL length
+  if (url.length > 2000) {
+    console.warn('URL exceeds recommended length');
+  }
+  
+  return url;
+}
+```
+
+## Combined Approach
+
+Use both postMessage and query parameters for maximum flexibility:
+```tsx
+import React, { useEffect, useState, useMemo } from "react";
+
+interface Props {
+  authData: AuthData;
+  useQueryParams?: boolean; // Toggle between methods
+}
+
+const FlexibleWebview: React.FC<Props> = ({ 
+  authData, 
+  useQueryParams = false 
+}) => {
+  const [isLoadingAuth, setIsLoadingAuth] = useState(false);
+
+  // Build URL with query params if needed
+  const webviewUrl = useMemo(() => {
+    const baseUrl = "https://embed.doshi.app";
+    
+    if (!useQueryParams) {
+      return baseUrl;
+    }
+    
+    const params = new URLSearchParams();
+    Object.entries(authData).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+    
+    return `${baseUrl}?${params.toString()}`;
+  }, [authData, useQueryParams]);
+
+  // postMessage handler
+  useEffect(() => {
+    if (useQueryParams) return; // Skip if using query params
+    
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data =
+          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+
+        if (data.type === "PING") {
+          handleSendAuth();
+        }
+      } catch (error) {
+        console.error("Error processing message:", error);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [useQueryParams]);
+
+  const handleSendAuth = async () => {
+    setIsLoadingAuth(true);
+
+    const filteredAuthData = Object.fromEntries(
+      Object.entries(authData).filter(([_, value]) => value !== "")
+    );
+
+    const webview = document.querySelector("iframe");
+    if (webview && webview.contentWindow) {
+      webview.contentWindow.postMessage(
+        JSON.stringify({
+          ...filteredAuthData,
+          type: "AUTH",
+        }),
+        "*"
+      );
+    }
+
+    setIsLoadingAuth(false);
+  };
+
+  return (
+    <div className="webview-container">
+      <iframe
+        src={webviewUrl}
+        className="h-full w-full"
+        frameBorder="0"
+        allowFullScreen
+      />
+    </div>
+  );
+};
+
+export default FlexibleWebview;
+```
+
+## URL Parameter Reference
+
+<ParamField query="token" type="string" required>
+  User authentication token
+</ParamField>
+
+<ParamField query="email" type="string" required>
+  User email address
+</ParamField>
+
+<ParamField query="firstName" type="string">
+  User's first name
+</ParamField>
+
+<ParamField query="lastName" type="string">
+  User's last name
+</ParamField>
+
+<ParamField query="partnerUserId" type="string">
+  Partner-specific user identifier
+</ParamField>
+
+<ParamField query="pathId" type="string">
+  Path or journey identifier
+</ParamField>
+
+<ParamField query="segment" type="string">
+  User segment classification
+</ParamField>
+
+<ParamField query="branchId" type="string">
+  Branch or location identifier
+</ParamField>
+
+## Comparison: postMessage vs Query Parameters
+
+| Feature | Query Parameters | postMessage |
+|---------|------------------|-------------|
+| **Security** | Visible in URLs | Hidden from URLs |
+| **Complexity** | Simple | Moderate |
+| **Real-time** | No | Yes |
+| **URL Length** | Limited (~2000 chars) | No limit |
+| **Debugging** | Easy (visible in URL) | Requires dev tools |
+| **Best For** | Simple auth, one-time setup | Sensitive data, dynamic flows |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Security Guidelines" icon="shield" href="/webview/security">
+    Review security considerations
+  </Card>
+  <Card title="Best Practices" icon="star" href="/webview/best-practices">
+    Optimize your implementation
+  </Card>
+</CardGroup>

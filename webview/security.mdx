@@ -1,0 +1,200 @@
+---
+title: "Security Considerations"
+description: "Essential security guidelines for webview authentication"
+---
+
+## Overview
+
+Security is paramount when implementing webview authentication. This guide covers critical security considerations for both postMessage and query parameter methods.
+
+## Origin Verification
+
+<Warning>
+  Always verify the origin of messages and requests in production environments
+</Warning>
+
+### For postMessage
+```javascript
+window.addEventListener("message", (event) => {
+  // ✅ Verify origin in production
+  if (event.origin !== 'https://embed.doshi.app') {
+    console.warn('Rejected message from unauthorized origin:', event.origin);
+    return;
+  }
+  
+  // Process message
+});
+```
+
+### Specify Target Origins
+```javascript
+// ❌ Never use in production
+webview.contentWindow.postMessage(data, "*");
+
+// ✅ Always specify exact origin in production
+webview.contentWindow.postMessage(data, "https://embed.doshi.app");
+```
+
+## Cross-Origin Communication
+
+### postMessage API Security
+
+<AccordionGroup>
+  <Accordion title="Message Validation">
+    Always validate the structure and content of messages:
+```javascript
+    try {
+      const data = typeof event.data === "string" 
+        ? JSON.parse(event.data) 
+        : event.data;
+      
+      // Validate message structure
+      if (!data.type || typeof data.type !== 'string') {
+        throw new Error('Invalid message structure');
+      }
+      
+      // Process valid message
+    } catch (error) {
+      console.error("Error processing message:", error);
+      return;
+    }
+```
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    Implement comprehensive error handling:
+```javascript
+    const handleMessage = (event) => {
+      try {
+        // Verify origin
+        if (event.origin !== 'https://embed.doshi.app') return;
+        
+        // Parse and validate
+        const data = JSON.parse(event.data);
+        
+        // Process message
+      } catch (error) {
+        console.error('Message handling failed:', error);
+        // Log to monitoring service
+        logError(error);
+      }
+    };
+```
+  </Accordion>
+
+  <Accordion title="HTTPS Enforcement">
+    Always use HTTPS for secure communication:
+```javascript
+    // ✅ Secure HTTPS URL
+    const webviewUrl = "https://embed.doshi.app";
+
+    // ❌ Never use HTTP in production
+    const insecureUrl = "http://embed.doshi.app";
+```
+  </Accordion>
+</AccordionGroup>
+
+## Query Parameter Security
+
+<Warning>
+  Query parameters are visible in URLs and browser history. Use with caution for sensitive data.
+</Warning>
+
+### Best Practices
+
+1. **Sanitize All Parameters**
+```javascript
+function sanitizeParam(value) {
+  if (!value) return '';
+  
+  // Remove potentially dangerous characters
+  return value
+    .replace(/[<>\"']/g, '')
+    .trim();
+}
+
+const authData = {
+  token: sanitizeParam(params.get('token')),
+  email: sanitizeParam(params.get('email')),
+  // ... other fields
+};
+```
+
+2. **Use Short-Lived Tokens**
+```javascript
+// Generate a temporary token with expiration
+const temporaryToken = generateToken({
+  userId: user.id,
+  expiresIn: '5m' // 5 minutes
+});
+
+const webviewUrl = `https://embed.doshi.app?token=${temporaryToken}`;
+```
+
+3. **Clear Sensitive Parameters**
+```javascript
+// After reading parameters, clear them from URL
+if (window.history.replaceState) {
+  const url = new URL(window.location.href);
+  url.search = ''; // Clear all query params
+  window.history.replaceState({}, document.title, url.toString());
+}
+```
+
+4. **Respect URL Length Limits**
+
+<Note>
+  URLs should generally stay under 2000 characters for maximum browser compatibility
+</Note>
+```javascript
+function buildWebviewUrl(baseUrl, data) {
+  const params = new URLSearchParams();
+  
+  Object.entries(data).forEach(([key, value]) => {
+    if (value) params.append(key, value);
+  });
+  
+  const fullUrl = `${baseUrl}?${params.toString()}`;
+  
+  // Check URL length
+  if (fullUrl.length > 2000) {
+    console.warn('URL exceeds recommended length. Consider using postMessage.');
+  }
+  
+  return fullUrl;
+}
+```
+
+## Security Checklist
+
+<Check>Use HTTPS for all communication</Check>
+<Check>Verify message origins in production</Check>
+<Check>Never use "*" wildcard for target origins in production</Check>
+<Check>Validate all incoming messages and parameters</Check>
+<Check>Sanitize user input</Check>
+<Check>Use short-lived tokens</Check>
+<Check>Clear sensitive data from URLs after reading</Check>
+<Check>Implement comprehensive error handling</Check>
+<Check>Log security events for monitoring</Check>
+<Check>Test across different browsers and environments</Check>
+
+## Common Security Pitfalls
+
+| Pitfall | Risk | Solution |
+|---------|------|----------|
+| Using `"*"` for postMessage target | Any site can receive messages | Specify exact origin |
+| Sensitive tokens in URLs | Exposed in logs/history | Use postMessage or temporary tokens |
+| No origin verification | Malicious sites can send messages | Always check `event.origin` |
+| Missing input validation | XSS vulnerabilities | Sanitize all inputs |
+| Long-lived tokens | Increased attack window | Use short expiration times |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="postMessage Implementation" icon="message" href="/webview/postmessage">
+    Implement secure real-time authentication
+  </Card>
+  <Card title="Query Parameters" icon="link" href="/webview/query-parameters">
+    Use URL-based authentication safely
+  </Card>
+</CardGroup>

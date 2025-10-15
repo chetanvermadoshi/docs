@@ -1,0 +1,332 @@
+---
+title: "postMessage Authentication"
+description: "Implement secure real-time authentication using the postMessage API"
+---
+
+## Overview
+
+The postMessage API provides secure, real-time cross-origin communication between your parent window and the embedded webview. This is the recommended method for handling sensitive authentication data.
+
+## How It Works
+
+<Steps>
+  <Step title="Webview Sends PING">
+    The embedded webview sends a PING message to signal it's ready
+  </Step>
+  <Step title="Parent Receives PING">
+    Parent window listens for the PING and prepares authentication data
+  </Step>
+  <Step title="Parent Sends AUTH">
+    Parent sends authentication data back to the webview
+  </Step>
+  <Step title="Webview Processes AUTH">
+    Webview receives and processes the authentication data
+  </Step>
+</Steps>
+
+## React Implementation
+
+### Parent Component
+```tsx
+import React, { useEffect, useState } from "react";
+
+interface AuthData {
+  token: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  partnerUserId: string;
+  pathId: string;
+  segment: string;
+  branchId: string;
+}
+
+interface WebviewMessage {
+  type: string;
+  [key: string]: any;
+}
+
+interface Props {
+  authData: AuthData;
+}
+
+const WebviewComponent: React.FC<Props> = ({ authData }) => {
+  const [isLoadingAuth, setIsLoadingAuth] = useState(false);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // ✅ Verify origin in production
+      // if (event.origin !== 'https://embed.doshi.app') return;
+      
+      try {
+        const data: WebviewMessage =
+          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+
+        // When we receive PING from webview, send the auth data
+        if (data.type === "PING") {
+          handleSendAuth();
+        }
+      } catch (error) {
+        console.error("Error processing message:", error);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  const handleSendAuth = async () => {
+    setIsLoadingAuth(true);
+
+    // Filter out empty values from authData
+    const filteredAuthData = Object.fromEntries(
+      Object.entries(authData).filter(([_, value]) => value !== "")
+    );
+
+    // Find the webview and send message
+    const webview = document.querySelector("iframe");
+    if (webview && webview.contentWindow) {
+      webview.contentWindow.postMessage(
+        JSON.stringify({
+          ...filteredAuthData,
+          type: "AUTH",
+        }),
+        "*" // ⚠️ In production: "https://embed.doshi.app"
+      );
+    }
+
+    setIsLoadingAuth(false);
+  };
+
+  return (
+    <div className="webview-container">
+      <iframe
+        src="https://embed.doshi.app"
+        className="h-full w-full"
+        frameBorder="0"
+        allowFullScreen
+      />
+    </div>
+  );
+};
+
+export default WebviewComponent;
+```
+
+### Usage Example
+```tsx
+import WebviewComponent from './WebviewComponent';
+
+function App() {
+  const authData = {
+    token: "user_token_123",
+    email: "user@example.com",
+    firstName: "John",
+    lastName: "Doe",
+    partnerUserId: "partner_123",
+    pathId: "path_456",
+    segment: "premium",
+    branchId: "branch_789",
+  };
+
+  return (
+    <div className="app">
+      <h1>My Application</h1>
+      <WebviewComponent authData={authData} />
+    </div>
+  );
+}
+```
+
+## Vanilla JavaScript Implementation
+
+### Parent Window
+```javascript
+// Define your auth data
+const authData = {
+  token: "user_token_123",
+  email: "user@example.com",
+  firstName: "John",
+  lastName: "Doe",
+  partnerUserId: "partner_123",
+  pathId: "path_456",
+  segment: "premium",
+  branchId: "branch_789",
+};
+
+// Create and add webview to the page
+const webview = document.createElement("iframe");
+webview.src = "https://embed.doshi.app";
+webview.className = "h-full w-full";
+webview.frameBorder = "0";
+webview.allowFullscreen = true;
+
+document.querySelector("#your-container-id").appendChild(webview);
+
+// Handle messages from webview
+function handleMessage(event) {
+  // ✅ Verify origin in production
+  // if (event.origin !== 'https://embed.doshi.app') return;
+  
+  try {
+    const data =
+      typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+
+    // When we receive PING from webview, send the auth data
+    if (data.type === "PING") {
+      // Filter out empty values from authData
+      const filteredAuthData = Object.fromEntries(
+        Object.entries(authData).filter(([_, value]) => value !== "")
+      );
+
+      // Send auth data to webview
+      webview.contentWindow.postMessage(
+        JSON.stringify({
+          ...filteredAuthData,
+          type: "AUTH",
+        }),
+        "*" // ⚠️ In production: "https://embed.doshi.app"
+      );
+    }
+  } catch (error) {
+    console.error("Error processing message:", error);
+  }
+}
+
+// Add message listener
+window.addEventListener("message", handleMessage);
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  window.removeEventListener("message", handleMessage);
+});
+```
+
+## Child Window (Webview) Implementation
+
+### Sending PING
+```javascript
+// Inside the webview, send PING to parent when ready
+window.parent.postMessage(
+  JSON.stringify({ type: "PING" }),
+  "*" // ⚠️ In production: specify parent origin
+);
+```
+
+### Receiving AUTH Data
+```javascript
+// Listen for AUTH response from parent
+window.addEventListener("message", (event) => {
+  // ✅ Verify origin in production
+  // if (event.origin !== 'https://parent-domain.com') return;
+  
+  try {
+    const data = typeof event.data === "string" 
+      ? JSON.parse(event.data) 
+      : event.data;
+    
+    if (data.type === "AUTH") {
+      // Process authentication data
+      const { token, email, firstName, lastName, partnerUserId } = data;
+      
+      // Store token for API calls
+      localStorage.setItem('authToken', token);
+      
+      // Update UI with user info
+      console.log(`Authenticated user: ${firstName} ${lastName}`);
+      
+      // Initialize your application
+      initializeApp(data);
+    }
+  } catch (error) {
+    console.error("Error processing auth message:", error);
+  }
+});
+
+function initializeApp(authData) {
+  // Your app initialization logic
+  console.log('App initialized with auth data:', authData);
+}
+```
+
+## Advanced: Retry Logic
+
+Add retry logic for more robust authentication:
+```typescript
+const WebviewWithRetry: React.FC<Props> = ({ authData }) => {
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
+
+  const handleSendAuth = async () => {
+    try {
+      const filteredAuthData = Object.fromEntries(
+        Object.entries(authData).filter(([_, value]) => value !== "")
+      );
+
+      const webview = document.querySelector("iframe");
+      if (webview && webview.contentWindow) {
+        webview.contentWindow.postMessage(
+          JSON.stringify({
+            ...filteredAuthData,
+            type: "AUTH",
+          }),
+          "*"
+        );
+      } else {
+        throw new Error("Webview not found");
+      }
+    } catch (error) {
+      console.error("Error sending auth:", error);
+      
+      if (retryCount < MAX_RETRIES) {
+        setTimeout(() => {
+          setRetryCount(retryCount + 1);
+          handleSendAuth();
+        }, RETRY_DELAY);
+      }
+    }
+  };
+
+  // ... rest of component
+};
+```
+
+## Message Types
+
+<ParamField path="type" type="string" required>
+  The message type identifier
+
+  <Expandable title="Available Types">
+    - `PING`: Sent by webview to signal readiness
+    - `AUTH`: Sent by parent with authentication data
+    - Custom types: You can define your own message types
+  </Expandable>
+</ParamField>
+
+## Testing
+```javascript
+// Test PING/PONG flow
+function testPostMessage() {
+  const testData = {
+    type: "PING"
+  };
+  
+  window.postMessage(JSON.stringify(testData), "*");
+  
+  window.addEventListener("message", (event) => {
+    console.log("Received message:", event.data);
+  });
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Security Guidelines" icon="shield" href="/webview/security">
+    Review security best practices
+  </Card>
+  <Card title="Best Practices" icon="star" href="/webview/best-practices">
+    Optimize your implementation
+  </Card>
+</CardGroup>
