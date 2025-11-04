@@ -6,7 +6,7 @@
     "description": "API specification for Doshi client-facing services."
   },
   "servers": [
-   {
+    {
       "url": "https://production-doshi-api-8kq2.encr.app",
       "description": "Production server"
     },
@@ -67,7 +67,7 @@
         },
         "required": ["success"]
       },
-      "GetAuthTokenRequest": {
+      "GetCustomTokenRequest": {
         "type": "object",
         "properties": {
           "email": {
@@ -75,134 +75,37 @@
             "format": "email"
           },
           "partnerUserId": {
-            "type": "string"
-          },
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
-            "type": "string"
-          },
-          "pathId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
           },
           "branchId": {
-            "type": "string"
-          },
-          "dob": {
             "type": "string",
-            "format": "date"
+            "minLength": 2,
+            "maxLength": 50
           },
-          "organizationId": {
-            "type": "string"
+          "firstName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 50
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 50
           }
         },
-        "description": "Request body for generating an authentication token."
+        "description": "Request body for generating a custom authentication token. Either email or partnerUserId is required."
       },
-      "AuthTokenResponse": {
+      "GetCustomTokenResponse": {
         "type": "object",
         "properties": {
           "token": {
-            "type": "string"
-          },
-          "userId": {
-            "type": "string"
-          },
-          "isNewUser": {
-            "type": "boolean"
-          },
-          "institutionId": {
-            "type": "string"
-          },
-          "branchId": {
             "type": "string",
-            "nullable": true
-          },
-          "preference": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "brand": {
-            "type": "object",
-            "additionalProperties": true
+            "description": "Firebase authentication token"
           }
         },
-        "required": ["token", "userId", "isNewUser", "institutionId"]
-      },
-      "OtpRequiredResponse": {
-        "type": "object",
-        "properties": {
-          "isOtpRequired": {
-            "type": "boolean",
-            "example": true
-          },
-          "success": {
-            "type": "boolean",
-            "example": true
-          }
-        },
-        "required": ["isOtpRequired", "success"]
-      },
-      "GetAuthTokenResponse": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/AuthTokenResponse"
-          },
-          {
-            "$ref": "#/components/schemas/OtpRequiredResponse"
-          }
-        ]
-      },
-      "SendOTPRequest": {
-        "type": "object",
-        "properties": {
-          "req": {
-            "type": "object",
-            "properties": {
-              "organizationId": {
-                "type": "string"
-              },
-              "partnerUserId": {
-                "type": "string"
-              },
-              "firstName": {
-                "type": "string"
-              },
-              "lastName": {
-                "type": "string"
-              },
-              "dob": {
-                "type": "string",
-                "format": "date"
-              }
-            },
-            "required": [
-              "organizationId",
-              "partnerUserId",
-              "firstName",
-              "lastName",
-              "dob"
-            ]
-          },
-          "channel": {
-            "type": "string",
-            "enum": ["sms", "call", "whatsapp"],
-            "default": "sms"
-          }
-        },
-        "required": ["req"]
-      },
-      "VerifyOTPRequest": {
-        "type": "object",
-        "properties": {
-          "req": {
-            "$ref": "#/components/schemas/GetAuthTokenRequest"
-          },
-          "code": {
-            "type": "string"
-          }
-        },
-        "required": ["req", "code"]
+        "required": ["token"]
       },
       "Course": {
         "type": "object",
@@ -616,106 +519,28 @@
     }
   ],
   "paths": {
-    "/client/auth/token": {
+    "/client/auth/custom-token": {
       "post": {
         "tags": ["Auth"],
-        "summary": "Get Authentication Token",
-        "description": "Generates a custom Firebase authentication token for a user. Can also trigger a 2FA flow if enabled for the institution.",
+        "summary": "Get Custom Authentication Token",
+        "description": "Generates a custom Firebase authentication token for a user. Requires either email or partnerUserId. Does not support 2FA/OTP flow.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GetAuthTokenRequest"
+                "$ref": "#/components/schemas/GetCustomTokenRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Authentication token response or OTP required indicator.",
+            "description": "Successfully generated authentication token.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetAuthTokenResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/client/auth/send-otp": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Send OTP",
-        "description": "Sends a One-Time Password (OTP) to the user's phone number for 2FA.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendOTPRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successfully sent OTP.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/client/auth/verify-otp": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Verify OTP",
-        "description": "Verifies the OTP code and, if successful, returns an authentication token.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyOTPRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successfully verified OTP and generated token.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthTokenResponse"
+                  "$ref": "#/components/schemas/GetCustomTokenResponse"
                 }
               }
             }
