@@ -10,15 +10,22 @@ Doshi webview authentication uses a secure two-step process:
 1. **Generate a nonce token** by calling the Doshi API with your API key
 2. **Pass the token to the iframe** using postMessage or query parameters
 
+<Warning>
+  **IP Whitelisting Required**: Your server's IP address must be whitelisted to access the Doshi API. Contact [hello@doshi.app](mailto:hello@doshi.app) with your server IP addresses to get started.
+</Warning>
+
 <Steps>
-  <Step title="Get API Key">
-    Contact [hello@doshi.app](mailto:hello@doshi.app) to receive your static API key
+  <Step title="Get API Key & Whitelist IP">
+    Contact [hello@doshi.app](mailto:hello@doshi.app) to:
+
+    - Receive your API key
+    - Whitelist your server IP address(es)
   </Step>
   <Step title="Generate Nonce Token">
-    Call the authentication endpoint with your API key to generate a nonce token
+    Call the authentication endpoint with your API key from your whitelisted server
   </Step>
   <Step title="Embed Webview">
-    Pass the nonce token to the Doshi iframe using postMessage or query parameters
+    Pass the nonce token to the Doshi Frontend using postMessage or query parameters
   </Step>
   <Step title="User Signs In">
     Doshi handles the sign-in process, including 2FA if enabled
@@ -26,26 +33,28 @@ Doshi webview authentication uses a secure two-step process:
 </Steps>
 
 ## Authentication Flow
+
 ```mermaid
 sequenceDiagram
     participant Client as Your Application
     participant API as Doshi API
-    participant Iframe as Doshi Iframe
+    participant Frontend as Doshi Frontend
     participant User as End User
 
-    Client->>API: POST /client/auth/token<br/>(with API Key)
+    Client->>API: POST /client/auth/custom-token<br/>(with API Key)
     API->>Client: Returns nonce token
-    Client->>Iframe: Pass token + user data
-    Iframe->>User: Shows login/2FA screen if needed
-    User->>Iframe: Completes authentication
-    Iframe->>Iframe: Session active (1hr + 12hr refresh)
+    Client->>Frontend: Pass token + user data
+    Frontend->>User: Shows login/2FA screen if needed
+    User->>Frontend: Completes authentication
+    Frontend->>Frontend: Session active (1hr + 12hr refresh)
 ```
 
 ## Step 1: Generate Nonce Token
 
 Call the authentication endpoint with your API key:
+
 ```bash
-curl -X POST https://production-doshi-api-8kq2.encr.app/client/auth/token \
+curl -X POST https://production-doshi-api-8kq2.encr.app/client/auth/custom-token \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -53,31 +62,40 @@ curl -X POST https://production-doshi-api-8kq2.encr.app/client/auth/token \
     "partnerUserId": "partner_123",
     "firstName": "John",
     "lastName": "Doe",
-    "pathId": "path_456",
     "branchId": "branch_789"
   }'
 ```
 
+### API Parameters
+
+**Required (at least one):**
+
+- `email` - User's email address
+- `partnerUserId` - Your internal user ID
+
+**Optional:**
+
+- `firstName` - User's first name
+- `lastName` - User's last name
+- `branchId` - Branch or location identifier
+
 <Note>
-  You must provide either `email` OR `partnerUserId` (or both). Other fields are optional.
+  You must provide either `email` OR `partnerUserId` (or both). All other fields are optional.
 </Note>
 
 **Response:**
+
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "userId": "user_123",
-  "isNewUser": false,
-  "institutionId": "inst_456",
-  "branchId": "branch_789"
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
 See the [full API reference](/api-reference/auth/get-custom-authentication-token) for details.
 
-## Step 2: Pass Token to Iframe
+## Step 2: Pass Token to Doshi Frontend
 
-Pass the nonce token to the Doshi iframe using one of two methods:
+Pass the nonce token to the Doshi Frontend using one of two methods:
 
 <CardGroup cols={2}>
   <Card title="postMessage (Recommended)" icon="message" href="/webview/postmessage">
@@ -88,71 +106,89 @@ Pass the nonce token to the Doshi iframe using one of two methods:
   </Card>
 </CardGroup>
 
-### Required Parameter
+### Frontend Parameters
+
+**Required:**
+
+- `token` - The nonce token from the API
+
+**Optional:**
+
+- `email` - User's email address
+- `segment` - For handling multiple learning paths
+- `branchId` - Branch or location identifier
+
+### 2FA Parameters (Optional)
+
+When 2FA is enabled, pass these additional parameters:
+
+**`All 2FA fields are required when is2FaEnabled is true:`**
+
+- `is2FaEnabled` - Set to `true`
+- `dob` - Date of birth (YYYY-MM-DD)
+- `organizationId` - Your organization ID
+- `partnerUserId` - Your internal user ID
+- `firstName` - User's first name
+- `lastName` - User's last name
 
 <ParamField path="token" type="string" required>
   The nonce token received from the API
 </ParamField>
 
-### Optional Parameters
-
 <ParamField path="email" type="string">
-  User's email address
+  User's email address (optional)
 </ParamField>
 
 <ParamField path="segment" type="string">
-  Used for handling multiple learning paths under the same organization
+  Used for handling multiple learning paths under the same organization (optional)
 </ParamField>
 
 <ParamField path="branchId" type="string">
-  Branch or location identifier
+  Branch or location identifier (optional)
 </ParamField>
 
-### 2FA Parameters (Optional)
-
-When 2FA is enabled for your organization, pass these additional parameters so the iframe can handle the OTP flow:
-
 <ParamField path="is2FaEnabled" type="boolean">
-  Set to `true` to enable 2FA flow in the iframe
+  Set to `true` to enable 2FA flow (optional, but if true, all 2FA fields below are required)
 </ParamField>
 
 <ParamField path="dob" type="string">
-  User's date of birth (required for 2FA, format: YYYY-MM-DD)
+  User's date of birth - YYYY-MM-DD format (required when is2FaEnabled is true)
 </ParamField>
 
 <ParamField path="organizationId" type="string">
-  Your organization ID (required for 2FA)
+  Your organization ID (required when is2FaEnabled is true)
 </ParamField>
 
 <ParamField path="partnerUserId" type="string">
-  Your internal user ID (required for 2FA)
+  Your internal user ID (required when is2FaEnabled is true)
 </ParamField>
 
 <ParamField path="firstName" type="string">
-  User's first name (required for 2FA)
+  User's first name (required when is2FaEnabled is true)
 </ParamField>
 
 <ParamField path="lastName" type="string">
-  User's last name (required for 2FA)
+  User's last name (required when is2FaEnabled is true)
 </ParamField>
 
 <Note>
-  When 2FA is enabled, the Doshi iframe automatically handles the OTP send and verification flow. You don't need to call the OTP endpoints separately.
+  When 2FA is enabled, the Doshi Frontend automatically handles the OTP send and verification flow. You don't need to call the OTP endpoints separately.
 </Note>
 
 ## Step 3: Session Management
 
-Once authenticated, the Doshi iframe automatically manages the session:
+Once authenticated, the Doshi Frontend automatically manages the session:
 
 - **ID Token TTL**: 1 hour
 - **Refresh Token TTL**: 12 hours
-- **Auto-refresh**: The iframe automatically refreshes tokens as needed
+- **Auto-refresh**: Tokens are refreshed automatically
 
 No additional action required from your application!
 
 ## Quick Example
 
 ### React with postMessage
+
 ```tsx
 import React, { useEffect, useState } from "react";
 
@@ -162,16 +198,16 @@ const DoshiEmbed = () => {
   useEffect(() => {
     // Step 1: Get nonce token from API
     async function authenticate() {
-      const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/token', {
+      const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/custom-token', {
         method: 'POST',
         headers: {
           'Authorization': 'Bearer YOUR_API_KEY',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          email: 'user@example.com',
-          partnerUserId: 'partner_123',
-          branchId: 'branch_789'
+          email: 'user@example.com',  // Required (or partnerUserId)
+          partnerUserId: 'partner_123', // Optional (but one of email/partnerUserId required)
+          branchId: 'branch_789'        // Optional
         })
       });
       
@@ -185,7 +221,7 @@ const DoshiEmbed = () => {
   useEffect(() => {
     if (!token) return;
 
-    // Step 2: Listen for PING from iframe
+    // Step 2: Listen for PING from Doshi Frontend
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== 'https://embed.doshi.app') return;
       
@@ -194,15 +230,15 @@ const DoshiEmbed = () => {
         : event.data;
 
       if (data.type === "PING") {
-        // Step 3: Send token to iframe
+        // Step 3: Send token to Doshi Frontend
         const iframe = document.querySelector("iframe");
         if (iframe?.contentWindow) {
           iframe.contentWindow.postMessage(
             JSON.stringify({
-              token,
-              email: 'user@example.com',
-              segment: 'premium',
-              branchId: 'branch_789',
+              token,               // Required
+              email: 'user@example.com',  // Optional
+              segment: 'premium',         // Optional
+              branchId: 'branch_789',     // Optional
               type: "AUTH"
             }),
             "https://embed.doshi.app"
@@ -233,6 +269,7 @@ export default DoshiEmbed;
 ```
 
 ### React with Query Parameters
+
 ```tsx
 import React, { useEffect, useState } from "react";
 
@@ -242,15 +279,15 @@ const DoshiEmbed = () => {
   useEffect(() => {
     async function authenticate() {
       // Step 1: Get nonce token
-      const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/token', {
+      const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/custom-token', {
         method: 'POST',
         headers: {
           'Authorization': 'Bearer YOUR_API_KEY',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          email: 'user@example.com',
-          partnerUserId: 'partner_123'
+          email: 'user@example.com',      // Required (or partnerUserId)
+          partnerUserId: 'partner_123'    // Optional
         })
       });
       
@@ -258,10 +295,10 @@ const DoshiEmbed = () => {
       
       // Step 2: Build URL with token
       const params = new URLSearchParams({
-        token: data.token,
-        email: 'user@example.com',
-        segment: 'premium',
-        branchId: 'branch_789'
+        token: data.token,              // Required
+        email: 'user@example.com',      // Optional
+        segment: 'premium',             // Optional
+        branchId: 'branch_789'          // Optional
       });
       
       setIframeUrl(`https://embed.doshi.app?${params.toString()}`);
@@ -287,60 +324,15 @@ const DoshiEmbed = () => {
 export default DoshiEmbed;
 ```
 
-### Vanilla JavaScript
-```javascript
-// Step 1: Get nonce token
-async function authenticateUser() {
-  const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/token', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer YOUR_API_KEY',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      email: 'user@example.com',
-      partnerUserId: 'partner_123'
-    })
-  });
-  
-  const data = await response.json();
-  return data.token;
-}
-
-// Step 2: Create iframe with query parameters
-async function createDoshiEmbed() {
-  const token = await authenticateUser();
-  
-  const params = new URLSearchParams({
-    token: token,
-    email: 'user@example.com',
-    segment: 'premium',
-    branchId: 'branch_789'
-  });
-  
-  const iframe = document.createElement('iframe');
-  iframe.src = `https://embed.doshi.app?${params.toString()}`;
-  iframe.className = 'w-full h-screen';
-  iframe.frameBorder = '0';
-  iframe.allowFullscreen = true;
-  
-  document.getElementById('doshi-container').appendChild(iframe);
-}
-
-// Initialize
-createDoshiEmbed();
-```
-
 ## With 2FA Enabled
 
-When 2FA is enabled, include the additional parameters:
 ```tsx
 const authData = {
-  token: data.token,
-  email: 'user@example.com',
-  segment: 'premium',
-  branchId: 'branch_789',
-  // 2FA parameters
+  token: data.token,                    // Required
+  email: 'user@example.com',            // Optional
+  segment: 'premium',                   // Optional
+  branchId: 'branch_789',               // Optional
+  // All fields below are required when is2FaEnabled is true
   is2FaEnabled: true,
   dob: '1990-01-15',
   organizationId: 'org_123',
@@ -349,7 +341,7 @@ const authData = {
   lastName: 'Doe'
 };
 
-// The iframe will automatically show OTP screen and handle verification
+// The Doshi Frontend will automatically show OTP screen and handle verification
 ```
 
 ## Next Steps
@@ -369,5 +361,5 @@ const authData = {
 ## Need Help?
 
 <Card title="Contact Support" icon="envelope" href="mailto:hello@doshi.app">
-  Get your API key or ask questions: hello@doshi.app
+  Get your API key or ask questions: [hello@doshi.app](mailto:hello@doshi.app)
 </Card>

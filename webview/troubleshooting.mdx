@@ -601,6 +601,46 @@ description: "Common issues and solutions for webview authentication"
   </Accordion>
 </AccordionGroup>
 
+### IP Whitelisting Issues
+
+<AccordionGroup>
+  <Accordion title="403 Forbidden Error">
+    **Problem:** Receiving 403 Forbidden when calling Doshi API.
+
+    **Cause:** Your server IP is not whitelisted.
+
+    **Solution:**
+    
+    1. Find your server IP:
+```bash
+    curl ifconfig.me
+```
+
+    2. Email [hello@doshi.app](mailto:hello@doshi.app) with:
+       - Your organization name
+       - Your server IP address
+       - Whether it's for production or staging
+
+    3. Wait for confirmation that your IP is whitelisted
+  </Accordion>
+
+  <Accordion title="Works in one environment, not another">
+    **Problem:** API works in staging but not production (or vice versa).
+
+    **Cause:** Different servers have different IPs.
+
+    **Solution:**
+    
+    Get the IP from each server and have all of them whitelisted:
+```bash
+    # Run on each server
+    curl ifconfig.me
+```
+    
+    Contact [hello@doshi.app](mailto:hello@doshi.app) with all IPs.
+  </Accordion>
+</AccordionGroup>
+
 ## Debugging Tools
 
 ### Enable Debug Logging
