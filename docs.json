@@ -14,7 +14,7 @@
     "tabs": [
       {
         "tab": "Client API",
-        "openapi": "/newdocs.json"
+        "openapi": "/openapi1.json"
       },
       {
         "tab": "Webview",
