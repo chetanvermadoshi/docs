@@ -5,16 +5,60 @@ description: "Optimization tips and best practices for webview authentication"
 
 ## Security Best Practices
 
-### Always Use HTTPS
+### API Key Management
 
 <Warning>
-  Never use HTTP in production environments
+  **Critical**: Never expose your API key in client-side code. Always call the Doshi API from your backend.
 </Warning>
+```typescript
+// ✅ Correct - Backend handles API key
+// backend/api/auth.ts
+app.post('/generate-doshi-token', async (req, res) => {
+  const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/token', {
+    headers: {
+      'Authorization': `Bearer ${process.env.DOSHI_API_KEY}`
+    }
+  });
+  // ...
+});
+
+// ❌ Never do this - API key exposed
+// frontend/app.tsx
+const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/token', {
+  headers: {
+    'Authorization': 'Bearer sk_live_abc123...' // EXPOSED!
+  }
+});
+```
+
+### Environment Variables
+
+Store your API key securely:
+```bash
+# .env
+DOSHI_API_KEY=your_api_key_here
+DOSHI_API_URL=https://production-doshi-api-8kq2.encr.app
+```
+```typescript
+// config.ts
+export const config = {
+  doshiApiKey: process.env.DOSHI_API_KEY,
+  doshiApiUrl: process.env.DOSHI_API_URL,
+};
+
+// Never commit .env files
+// Add to .gitignore:
+// .env
+// .env.local
+```
+
+### Always Use HTTPS
 ```javascript
 // ✅ Correct
 const webviewUrl = "https://embed.doshi.app";
+const apiUrl = "https://production-doshi-api-8kq2.encr.app";
 
-// ❌ Never in production
+// ❌ Never use HTTP in production
 const insecureUrl = "http://embed.doshi.app";
 ```
 
@@ -32,85 +76,104 @@ window.addEventListener("message", (event) => {
 });
 ```
 
-### Use Short-Lived Tokens
-```javascript
-// Generate token with short expiration
-const token = generateToken({
-  userId: user.id,
-  expiresIn: '5m' // 5 minutes
-});
-```
-
-### Validate All Messages and Parameters
-```javascript
-function validateAuthData(data) {
-  const required = ['token', 'email'];
-  const missing = required.filter(field => !data[field]);
-  
-  if (missing.length > 0) {
-    throw new Error(`Missing required fields: ${missing.join(', ')}`);
-  }
-  
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(data.email)) {
-    throw new Error('Invalid email format');
-  }
-  
-  return true;
-}
-```
-
 ### Never Use Wildcards in Production
 ```javascript
-// ❌ Development only
+// ❌ Development/testing only
 webview.contentWindow.postMessage(data, "*");
 
-// ✅ Production
+// ✅ Production - always specify exact origin
 webview.contentWindow.postMessage(data, "https://embed.doshi.app");
+```
+
+### Validate All Data
+```typescript
+function validateAuthData(data: any): data is AuthData {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Invalid data format');
+  }
+
+  if (!data.token || typeof data.token !== 'string') {
+    throw new Error('Missing or invalid token');
+  }
+
+  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    throw new Error('Invalid email format');
+  }
+
+  return true;
+}
+
+// Use in your code
+try {
+  validateAuthData(authData);
+  // Proceed with authentication
+} catch (error) {
+  console.error('Validation failed:', error);
+  // Handle error
+}
 ```
 
 ## Performance Best Practices
 
-### Minimize Cross-Frame Communication
+### Minimize API Calls
 
 <Tip>
-  Send all authentication data in a single message rather than multiple messages
+  Cache the nonce token temporarily if you need to render multiple iframes for the same user session
 </Tip>
+```typescript
+// Token cache with expiration
+class TokenCache {
+  private cache = new Map<string, { token: string; expires: number }>();
+  private readonly TTL = 5 * 60 * 1000; // 5 minutes
+
+  async getToken(userId: string): Promise<string> {
+    const cached = this.cache.get(userId);
+    
+    if (cached && cached.expires > Date.now()) {
+      return cached.token;
+    }
+
+    // Fetch new token
+    const token = await this.fetchNewToken(userId);
+    
+    this.cache.set(userId, {
+      token,
+      expires: Date.now() + this.TTL
+    });
+
+    return token;
+  }
+
+  private async fetchNewToken(userId: string): Promise<string> {
+    // Call your backend
+    const response = await fetch('/api/generate-doshi-token', {
+      method: 'POST',
+      body: JSON.stringify({ userId })
+    });
+    const data = await response.json();
+    return data.token;
+  }
+}
+
+const tokenCache = new TokenCache();
+```
+
+### Optimize Message Size
 ```javascript
-// ✅ Send everything at once
+// ✅ Send all data in a single message
 const authData = {
   token: user.token,
   email: user.email,
-  firstName: user.firstName,
-  lastName: user.lastName,
-  // ... all data
+  segment: user.segment,
+  branchId: user.branchId,
   type: "AUTH"
 };
-
 webview.contentWindow.postMessage(JSON.stringify(authData), origin);
 
-// ❌ Avoid multiple messages
+// ❌ Avoid multiple sequential messages
 webview.contentWindow.postMessage(JSON.stringify({ token }), origin);
 webview.contentWindow.postMessage(JSON.stringify({ email }), origin);
-// ...
-```
-
-### Use Efficient Message Formats
-```javascript
-// ✅ Compact format
-const message = JSON.stringify({ type: "AUTH", ...authData });
-
-// ❌ Verbose format (avoid unnecessary nesting)
-const verboseMessage = JSON.stringify({
-  data: {
-    authentication: {
-      user: {
-        credentials: authData
-      }
-    }
-  }
-});
+webview.contentWindow.postMessage(JSON.stringify({ segment }), origin);
 ```
 
 ### Implement Proper Cleanup
@@ -129,120 +192,129 @@ useEffect(() => {
 }, []);
 ```
 
-### Cache Authentication State
-```typescript
-const [authState, setAuthState] = useState<'pending' | 'authenticated' | 'error'>('pending');
-const [authData, setAuthData] = useState<AuthData | null>(null);
+### Lazy Load the Iframe
+```tsx
+import React, { useState, useEffect } from 'react';
 
-// Cache authentication result
-const handleAuth = (data: AuthData) => {
-  setAuthData(data);
-  setAuthState('authenticated');
-  
-  // Store in session storage for persistence
-  sessionStorage.setItem('authState', 'authenticated');
-  sessionStorage.setItem('authData', JSON.stringify(data));
+const LazyWebview: React.FC = () => {
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    // Load iframe only when needed
+    const timer = setTimeout(() => {
+      setShouldLoad(true);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!shouldLoad) {
+    return <div>Preparing...</div>;
+  }
+
+  return <WebviewComponent />;
 };
+```
+
+### Preconnect to Doshi Domain
+```html
+<!-- Add to <head> for faster iframe loading -->
+<link rel="preconnect" href="https://embed.doshi.app">
+<link rel="dns-prefetch" href="https://embed.doshi.app">
 ```
 
 ## Error Handling Best Practices
 
 ### Comprehensive Error Handling
 ```typescript
-const handleMessage = async (event: MessageEvent) => {
+const handleAuthentication = async () => {
   try {
-    // Verify origin
-    if (event.origin !== 'https://embed.doshi.app') {
-      throw new Error(`Unauthorized origin: ${event.origin}`);
+    // Attempt to get token
+    const token = await fetchToken();
+    
+    if (!token) {
+      throw new Error('No token received');
     }
-    
-    // Parse data
-    const data = typeof event.data === "string" 
-      ? JSON.parse(event.data) 
-      : event.data;
-    
-    // Validate data
-    validateAuthData(data);
-    
-    // Process data
-    await processAuth(data);
+
+    // Attempt to send to iframe
+    await sendAuthToIframe(token);
     
   } catch (error) {
+    // Log error
     console.error('Authentication error:', error);
     
-    // Log to monitoring service
-    logError(error);
+    // Send to monitoring service
+    if (window.analytics) {
+      window.analytics.track('Authentication Failed', {
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
     
-    // Update UI
-    setAuthState('error');
-    setErrorMessage(error.message);
+    // Show user-friendly message
+    setError('Unable to authenticate. Please try again.');
     
-    // Notify user
-    showNotification('Authentication failed. Please try again.');
+    // Optionally retry
+    if (retryCount < MAX_RETRIES) {
+      setTimeout(() => {
+        setRetryCount(retryCount + 1);
+        handleAuthentication();
+      }, RETRY_DELAY);
+    }
   }
 };
 ```
 
-### Log Authentication Failures
-```javascript
-function logError(error) {
-  // Log to console
-  console.error('Auth error:', error);
-  
-  // Send to monitoring service
-  if (window.analytics) {
-    window.analytics.track('Authentication Failed', {
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-}
-```
+### User Feedback
+```tsx
+const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-### Provide User Feedback
-```typescript
-const [error, setError] = useState<string | null>(null);
-
-const handleAuthError = (error: Error) => {
-  setError('Authentication failed. Please refresh and try again.');
-  
-  // Auto-clear error after 5 seconds
-  setTimeout(() => setError(null), 5000);
-};
-
+// Show appropriate UI based on status
 return (
   <div>
-    {error && (
-      <div className="error-banner">
-        {error}
+    {status === 'loading' && (
+      <div className="loading-state">
+        <Spinner />
+        <p>Authenticating...</p>
       </div>
     )}
-    <iframe src={webviewUrl} />
+    
+    {status === 'error' && (
+      <div className="error-state">
+        <ErrorIcon />
+        <p>{errorMessage}</p>
+        <button onClick={retry}>Retry</button>
+      </div>
+    )}
+    
+    {status === 'success' && (
+      <iframe src={webviewUrl} />
+    )}
   </div>
 );
 ```
 
-### Handle Timeout Scenarios
+### Timeout Handling
 ```typescript
 const AUTH_TIMEOUT = 10000; // 10 seconds
 
-const waitForAuth = () => {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error('Authentication timeout'));
-    }, AUTH_TIMEOUT);
-    
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'AUTH') {
-        clearTimeout(timeout);
-        window.removeEventListener('message', handleMessage);
-        resolve(event.data);
-      }
-    };
-    
-    window.addEventListener('message', handleMessage);
-  });
+const authenticateWithTimeout = () => {
+  return Promise.race([
+    authenticate(),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Authentication timeout')), AUTH_TIMEOUT)
+    )
+  ]);
 };
+
+try {
+  await authenticateWithTimeout();
+} catch (error) {
+  if (error.message === 'Authentication timeout') {
+    setError('Authentication is taking longer than expected. Please check your connection.');
+  }
+}
 ```
 
 ## Method Selection Guide
@@ -251,29 +323,90 @@ const waitForAuth = () => {
 
 <Check>Handling sensitive authentication data</Check>
 <Check>Need for real-time, bidirectional communication</Check>
-<Check>Dynamic authentication flows</Check>
+<Check>Production environments</Check>
 <Check>Multiple authentication steps</Check>
 <Check>Maximum security requirements</Check>
+<Check>Complex 2FA flows</Check>
 ```typescript
-// Use postMessage for sensitive data
-const WebviewSecure = ({ authData }) => {
+// Use postMessage for production
+const ProductionWebview = ({ userData }) => {
   // postMessage implementation
-  // No sensitive data in URLs
+  // More secure, no data in URLs
 };
 ```
 
 ### When to Use Query Parameters
 
 <Check>Simple, one-time authentication</Check>
-<Check>Stateless authentication</Check>
+<Check>Rapid prototyping and development</Check>
 <Check>Need for easier debugging</Check>
 <Check>Simpler implementation requirements</Check>
-<Check>Data is not highly sensitive</Check>
+<Check>Quick demos or proof of concepts</Check>
 ```typescript
-// Use query params for simple auth
-const WebviewSimple = ({ authData }) => {
-  const url = `https://embed.doshi.app?token=${shortLivedToken}`;
+// Use query params for development/testing
+const DevelopmentWebview = ({ userData }) => {
+  const url = `https://embed.doshi.app?token=${token}`;
   return <iframe src={url} />;
+};
+```
+
+## Code Organization
+
+### Separation of Concerns
+```typescript
+// services/doshi-auth.service.ts
+export class DoshiAuthService {
+  private apiUrl: string;
+  private embedUrl: string;
+
+  constructor(config: Config) {
+    this.apiUrl = config.apiUrl;
+    this.embedUrl = config.embedUrl;
+  }
+
+  async getAuthToken(userData: UserData): Promise<string> {
+    const response = await fetch(`${this.apiUrl}/generate-token`, {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+    const data = await response.json();
+    return data.token;
+  }
+
+  buildEmbedUrl(token: string, params: AuthParams): string {
+    const urlParams = new URLSearchParams({ token, ...params });
+    return `${this.embedUrl}?${urlParams.toString()}`;
+  }
+}
+
+// components/DoshiEmbed.tsx
+export const DoshiEmbed: React.FC<Props> = ({ userData }) => {
+  const authService = useDoshiAuthService();
+  // Component logic
+};
+```
+
+### Configuration Management
+```typescript
+// config/doshi.config.ts
+export const doshiConfig = {
+  development: {
+    apiUrl: 'https://sandbox.api.doshi.app',
+    embedUrl: 'https://staging-embed.doshi.app',
+    enableDebugLogs: true,
+    strictOriginCheck: false
+  },
+  production: {
+    apiUrl: 'https://production-doshi-api-8kq2.encr.app',
+    embedUrl: 'https://embed.doshi.app',
+    enableDebugLogs: false,
+    strictOriginCheck: true
+  }
+};
+
+export const getConfig = () => {
+  const env = process.env.NODE_ENV || 'development';
+  return doshiConfig[env];
 };
 ```
 
@@ -282,25 +415,53 @@ const WebviewSimple = ({ authData }) => {
 ### Responsive Container
 ```css
 .webview-container {
-  /* Responsive sizing */
+  /* Full viewport height */
   width: 100%;
-  height: 900px;
-  max-height: 90vh;
+  height: 100vh;
+  
+  /* Prevent overflow */
   overflow: hidden;
   
-  /* Optional: rounded corners */
+  /* Optional: Add subtle border */
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
 }
 
 /* Mobile responsive */
 @media (max-width: 768px) {
   .webview-container {
-    height: 600px;
+    /* Adjust for mobile viewport */
+    height: calc(100vh - 60px); /* Account for mobile browser UI */
+  }
+}
+
+/* Tablet */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .webview-container {
+    height: calc(100vh - 80px);
   }
 }
 ```
 
-### Full-Width Iframe
+### Loading States
+```tsx
+const LoadingOverlay: React.FC = () => (
+  <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
+    <div className="text-center">
+      <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-solid border-blue-600 border-r-transparent"></div>
+      <p className="mt-4 text-gray-700">Loading Doshi...</p>
+    </div>
+  </div>
+);
+
+// Usage
+<div className="relative webview-container">
+  {isLoading && <LoadingOverlay />}
+  <iframe src={url} onLoad={() => setIsLoading(false)} />
+</div>
+```
+
+### Full-Screen Support
 ```css
 .webview-container iframe {
   width: 100%;
@@ -308,96 +469,173 @@ const WebviewSimple = ({ authData }) => {
   border: none;
   display: block;
 }
-```
 
-### Loading State
-```tsx
-const [isLoading, setIsLoading] = useState(true);
-
-return (
-  <div className="webview-container">
-    {isLoading && (
-      <div className="loading-overlay">
-        <div className="spinner" />
-        <p>Loading...</p>
-      </div>
-    )}
-    <iframe
-      src={webviewUrl}
-      onLoad={() => setIsLoading(false)}
-      className="h-full w-full"
-    />
-  </div>
-);
+/* Allow fullscreen */
+.webview-container iframe:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
 ```
 
 ## Testing Best Practices
 
-### Test in Multiple Environments
-
-<CardGroup cols={2}>
-  <Card title="Development" icon="laptop-code">
-    Test with localhost and development URLs
-  </Card>
-  <Card title="Staging" icon="flask">
-    Test with staging environment before production
-  </Card>
-  <Card title="Production" icon="server">
-    Use production URLs with proper origin validation
-  </Card>
-  <Card title="Cross-Browser" icon="browser">
-    Test across Chrome, Firefox, Safari, and Edge
-  </Card>
-</CardGroup>
-
-### Test Authentication Flow
+### Environment-Specific Testing
 ```typescript
-// Test helper
-const testAuthFlow = async () => {
-  console.log('Starting auth test...');
-  
-  // 1. Test PING
-  window.postMessage(JSON.stringify({ type: 'PING' }), '*');
-  
-  // 2. Wait for AUTH response
-  await waitForAuth();
-  
-  console.log('Auth test completed successfully');
-};
-```
+describe('Doshi Authentication', () => {
+  beforeEach(() => {
+    // Use sandbox environment for testing
+    process.env.DOSHI_API_URL = 'https://sandbox.api.doshi.app';
+  });
 
-### Monitor Performance
-```javascript
-// Measure authentication time
-const startTime = performance.now();
+  it('should generate auth token', async () => {
+    const token = await generateAuthToken({
+      email: 'test@example.com'
+    });
+    
+    expect(token).toBeDefined();
+    expect(typeof token).toBe('string');
+  });
 
-window.addEventListener('message', (event) => {
-  if (event.data.type === 'AUTH') {
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    
-    console.log(`Authentication took ${duration}ms`);
-    
-    // Log to analytics
-    analytics.track('Auth Performance', { duration });
-  }
+  it('should handle authentication errors', async () => {
+    // Test error handling
+    await expect(
+      generateAuthToken({ email: 'invalid' })
+    ).rejects.toThrow();
+  });
 });
 ```
 
-## Checklist
+### Mock API Responses
+```typescript
+// __mocks__/doshi-api.ts
+export const mockDoshiApi = {
+  generateToken: jest.fn().mockResolvedValue({
+    token: 'mock_token_123',
+    userId: 'user_123',
+    isNewUser: false
+  }),
+  
+  mockError: jest.fn().mockRejectedValue(
+    new Error('API Error')
+  )
+};
+```
 
-### Before Deployment
+### Integration Testing
+```typescript
+import { render, screen, waitFor } from '@testing-library/react';
 
-<Check>Replace all "*" wildcards with specific origins</Check>
-<Check>Enable HTTPS for all URLs</Check>
-<Check>Implement origin verification</Check>
-<Check>Add comprehensive error handling</Check>
-<Check>Test across multiple browsers</Check>
-<Check>Set up error logging and monitoring</Check>
-<Check>Validate all input data</Check>
-<Check>Use short-lived tokens</Check>
-<Check>Clear sensitive URL parameters</Check>
-<Check>Test authentication timeout scenarios</Check>
+test('displays webview after successful authentication', async () => {
+  render(<DoshiEmbed userEmail="test@example.com" />);
+  
+  // Should show loading initially
+  expect(screen.getByText('Loading...')).toBeInTheDocument();
+  
+  // Should show iframe after auth
+  await waitFor(() => {
+    expect(screen.getByTitle('Doshi Embed')).toBeInTheDocument();
+  });
+});
+```
+
+## Monitoring and Logging
+
+### Track Key Events
+```typescript
+// Track authentication flow
+const trackAuthEvent = (event: string, metadata?: any) => {
+  if (window.analytics) {
+    window.analytics.track(event, {
+      ...metadata,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV
+    });
+  }
+};
+
+// Usage
+trackAuthEvent('Auth Token Requested', { userId: user.id });
+trackAuthEvent('Auth Token Received', { userId: user.id });
+trackAuthEvent('Iframe Loaded', { userId: user.id });
+```
+
+### Error Monitoring
+```typescript
+// Send errors to monitoring service
+const logError = (error: Error, context?: any) => {
+  console.error('Doshi Auth Error:', error);
+  
+  // Send to error tracking service (e.g., Sentry)
+  if (window.Sentry) {
+    window.Sentry.captureException(error, {
+      extra: context
+    });
+  }
+};
+
+// Usage
+try {
+  await authenticate();
+} catch (error) {
+  logError(error, {
+    userId: user.id,
+    action: 'authentication'
+  });
+}
+```
+
+### Performance Monitoring
+```typescript
+// Measure authentication performance
+const measureAuthPerformance = async () => {
+  const startTime = performance.now();
+  
+  try {
+    await authenticate();
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    
+    // Log performance metric
+    console.log(`Authentication took ${duration}ms`);
+    
+    // Send to analytics
+    if (window.analytics) {
+      window.analytics.track('Auth Performance', {
+        duration,
+        status: 'success'
+      });
+    }
+  } catch (error) {
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    
+    if (window.analytics) {
+      window.analytics.track('Auth Performance', {
+        duration,
+        status: 'error'
+      });
+    }
+  }
+};
+```
+
+## Production Checklist
+
+<Check>API key stored securely in environment variables</Check>
+<Check>API calls made from backend only</Check>
+<Check>HTTPS used for all URLs</Check>
+<Check>Origin verification enabled for postMessage</Check>
+<Check>No "*" wildcards in production</Check>
+<Check>Comprehensive error handling implemented</Check>
+<Check>User feedback for all states (loading, error, success)</Check>
+<Check>Timeout handling for slow connections</Check>
+<Check>Proper cleanup of event listeners</Check>
+<Check>Error logging and monitoring configured</Check>
+<Check>Performance tracking in place</Check>
+<Check>Tested across multiple browsers</Check>
+<Check>Tested on mobile devices</Check>
+<Check>Responsive design implemented</Check>
+<Check>Accessibility considerations addressed</Check>
 
 ## Next Steps
 

@@ -5,78 +5,208 @@ description: "Learn how to implement secure webview-based authentication in your
 
 ## Introduction
 
-This guide explains how to implement secure webview-based authentication in web applications, specifically focusing on parent-child window communication. We support two main methods:
+Doshi provides a secure webview authentication system that uses a two-step process:
 
-1. **postMessage API** - Real-time, secure cross-origin communication
-2. **Query Parameters** - Simple, stateless authentication
+1. **Generate a nonce token** from the Doshi API using your API key
+2. **Pass the token** to the embedded Doshi iframe
 
-## When to Use Each Method
+This guide explains the authentication methods available after you've obtained your nonce token.
+
+<Note>
+  New to Doshi authentication? Start with the [Quick Start Guide](/webview/quickstart) for a complete walkthrough.
+</Note>
+
+## Authentication Methods
+
+After obtaining your nonce token from the API, you can pass it to the iframe using two methods:
 
 <CardGroup cols={2}>
   <Card title="postMessage API" icon="message" href="/webview/postmessage">
-    Best for real-time communication, sensitive data, and dynamic authentication flows
+    **Recommended for production**
+    
+    Real-time, secure cross-origin communication. Best for sensitive data and dynamic flows.
   </Card>
   <Card title="Query Parameters" icon="link" href="/webview/query-parameters">
-    Best for simple, one-time authentication and easier debugging
+    **Simple implementation**
+    
+    URL-based authentication. Best for quick setup and debugging.
   </Card>
 </CardGroup>
 
-## Authentication Data Structure
-
-All authentication methods use the following data structure:
-```typescript
-interface AuthData {
-  token: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  partnerUserId: string;
-  pathId: string;
-  segment: string;
-  branchId: string;
-}
-```
-
-## Quick Start
+## How It Works
 
 <Steps>
-  <Step title="Choose Your Method">
-    Select either postMessage or query parameters based on your security requirements
+  <Step title="Client Calls API">
+    Your backend calls `/client/auth/token` with your API key to generate a nonce token
   </Step>
-  <Step title="Review Security Guidelines">
-    Read our [security considerations](/webview/security) before implementation
+  <Step title="Pass Token to Iframe">
+    Your frontend passes the token to the Doshi iframe using postMessage or query parameters
   </Step>
-  <Step title="Implement Authentication">
-    Follow the guides for [postMessage](/webview/postmessage) or [query parameters](/webview/query-parameters)
+  <Step title="User Authenticates">
+    Doshi iframe handles user authentication, including 2FA if enabled
   </Step>
-  <Step title="Follow Best Practices">
-    Review [best practices](/webview/best-practices) and [troubleshooting](/webview/troubleshooting)
+  <Step title="Session Active">
+    User session is managed automatically (1hr ID token + 12hr refresh token)
   </Step>
 </Steps>
 
-## Basic Webview Setup
-```tsx
+## Data Structure
+
+### Required Parameter
+```typescript
+interface AuthData {
+  token: string; // Nonce token from API (required)
+}
+```
+
+### Optional Parameters
+```typescript
+interface AuthData {
+  token: string;              // Required
+  email?: string;             // User's email
+  segment?: string;           // For multiple paths in same org
+  branchId?: string;          // Branch/location identifier
+  
+  // 2FA Parameters (when is2FaEnabled is true)
+  is2FaEnabled?: boolean;     // Enable 2FA flow
+  dob?: string;               // Date of birth (YYYY-MM-DD)
+  organizationId?: string;    // Your organization ID
+  partnerUserId?: string;     // Your internal user ID
+  firstName?: string;         // User's first name
+  lastName?: string;          // User's last name
+}
+```
+
+## Basic Setup
+
+### 1. Get Your API Key
+
+Contact [hello@doshi.app](mailto:hello@doshi.app) to receive your static API key.
+
+### 2. Generate Nonce Token
+```bash
+curl -X POST https://production-doshi-api-8kq2.encr.app/client/auth/token \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com"
+  }'
+```
+
+See the [full API reference](/api-reference/auth/get-custom-authentication-token).
+
+### 3. Embed the Webview
+```html
 <iframe
   src="https://embed.doshi.app"
-  className="h-full w-full"
-  frameBorder="0"
-  allowFullScreen
-/>
+  class="w-full h-screen"
+  frameborder="0"
+  allowfullscreen
+></iframe>
+```
+
+### 4. Pass Token to Iframe
+
+Choose your preferred method:
+
+<CodeGroup>
+```tsx postMessage
+// Listen for PING from iframe
+window.addEventListener("message", (event) => {
+  if (event.data.type === "PING") {
+    iframe.contentWindow.postMessage(
+      JSON.stringify({
+        token: "your_nonce_token",
+        email: "user@example.com",
+        type: "AUTH"
+      }),
+      "https://embed.doshi.app"
+    );
+  }
+});
+```
+```tsx Query Parameters
+const params = new URLSearchParams({
+  token: "your_nonce_token",
+  email: "user@example.com",
+  segment: "premium"
+});
+
+const iframeUrl = `https://embed.doshi.app?${params.toString()}`;
+```
+
+</CodeGroup>
+
+## 2FA Support
+
+When 2FA is enabled for your organization, pass the required user information:
+```typescript
+const authData = {
+  token: "your_nonce_token",
+  email: "user@example.com",
+  is2FaEnabled: true,
+  dob: "1990-01-15",
+  organizationId: "org_123",
+  partnerUserId: "partner_123",
+  firstName: "John",
+  lastName: "Doe"
+};
+```
+
+The Doshi iframe will automatically:
+1. Display the OTP input screen
+2. Send the OTP to the user's phone
+3. Verify the OTP
+4. Complete authentication
+
+<Note>
+  You don't need to call `/client/auth/send-otp` or `/client/auth/verify-otp` separately. The iframe handles the entire 2FA flow.
+</Note>
+
+## Session Management
+
+Once authenticated, sessions are managed automatically:
+
+- **ID Token**: Valid for 1 hour
+- **Refresh Token**: Valid for 12 hours  
+- **Auto-refresh**: Tokens are refreshed automatically by the iframe
+
+No action required from your application!
+
+## Parameter Details
+
+### segment
+
+The `segment` parameter is used for handling multiple learning paths under the same organization. This allows you to direct users to different educational journeys based on their needs or preferences.
+
+**Example:**
+```typescript
+{
+  segment: "premium",  // or "basic", "enterprise", etc.
+}
+```
+
+### branchId
+
+Used to identify which branch or location the user belongs to within your organization.
+
+**Example:**
+```typescript
+{
+  branchId: "branch_789",  // Your branch identifier
+}
 ```
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Security Guidelines" icon="shield" href="/webview/security">
-    Learn about security best practices
+<CardGroup cols={3}>
+  <Card title="Quick Start" icon="rocket" href="/webview/quickstart">
+    Complete walkthrough with examples
   </Card>
-  <Card title="postMessage Method" icon="message" href="/webview/postmessage">
-    Implement secure real-time authentication
+  <Card title="Security" icon="shield" href="/webview/security">
+    Security best practices
   </Card>
-  <Card title="Query Parameters" icon="link" href="/webview/query-parameters">
-    Use URL-based authentication
-  </Card>
-  <Card title="Best Practices" icon="star" href="/webview/best-practices">
-    Optimize your implementation
+  <Card title="postMessage Guide" icon="message" href="/webview/postmessage">
+    Detailed postMessage implementation
   </Card>
 </CardGroup>

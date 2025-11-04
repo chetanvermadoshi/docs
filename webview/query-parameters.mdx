@@ -5,68 +5,181 @@ description: "Implement simple URL-based authentication using query parameters"
 
 ## Overview
 
-Query parameter authentication is a simpler approach that passes authentication data through the URL. This method is ideal for stateless authentication and debugging.
+Query parameter authentication is a simpler approach that passes authentication data through the URL. This method is ideal for quick implementation and debugging.
 
 <Warning>
-  Query parameters are visible in URLs and browser history. Use with caution for sensitive data or implement additional security measures.
+  Query parameters are visible in URLs and browser history. While the nonce token is short-lived, consider using postMessage for production environments.
 </Warning>
 
 ## How It Works
 
 <Steps>
+  <Step title="Generate Nonce Token">
+    Your backend calls the Doshi API to get a nonce token
+  </Step>
   <Step title="Build URL">
-    Construct the webview URL with authentication data as query parameters
+    Construct the webview URL with the token and other data as query parameters
   </Step>
   <Step title="Load Webview">
     Load the iframe with the constructed URL
   </Step>
-  <Step title="Extract Parameters">
-    Webview extracts and validates query parameters on load
-  </Step>
-  <Step title="Clear URL (Optional)">
-    Optionally clear sensitive parameters from the URL after reading
+  <Step title="Webview Authenticates">
+    Webview extracts parameters and authenticates the user, handling 2FA if needed
   </Step>
 </Steps>
 
 ## React Implementation
 
-### Basic Implementation
+### Complete Example with API Call
 ```tsx
-import React, { useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 
 interface AuthData {
   token: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  partnerUserId: string;
-  pathId: string;
-  segment: string;
-  branchId: string;
+  email?: string;
+  segment?: string;
+  branchId?: string;
+  is2FaEnabled?: boolean;
+  dob?: string;
+  organizationId?: string;
+  partnerUserId?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 interface Props {
-  authData: AuthData;
+  userEmail: string;
+  segment?: string;
+  branchId?: string;
+  // 2FA props
+  is2FaEnabled?: boolean;
+  dob?: string;
+  organizationId?: string;
+  partnerUserId?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
-const WebviewWithQueryParams: React.FC<Props> = ({ authData }) => {
-  // Build URL with query parameters
+const WebviewWithQueryParams: React.FC<Props> = ({ 
+  userEmail,
+  segment,
+  branchId,
+  is2FaEnabled = false,
+  dob,
+  organizationId,
+  partnerUserId,
+  firstName,
+  lastName
+}) => {
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Step 1: Get nonce token from your backend
+  useEffect(() => {
+    async function fetchToken() {
+      try {
+        // Call YOUR backend which securely calls Doshi API
+        const response = await fetch('/api/generate-doshi-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: userEmail,
+            branchId
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate token');
+        }
+
+        const data = await response.json();
+        setAuthToken(data.token);
+      } catch (error) {
+        console.error('Failed to fetch auth token:', error);
+        setError('Authentication failed. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchToken();
+  }, [userEmail, branchId]);
+
+  // Step 2: Build URL with token and params
   const webviewUrl = useMemo(() => {
+    if (!authToken) return null;
+
     const baseUrl = "https://embed.doshi.app";
     const params = new URLSearchParams();
     
-    // Add non-empty auth data to query params
-    Object.entries(authData).forEach(([key, value]) => {
-      if (value) {
-        params.append(key, value);
-      }
-    });
+    // Required
+    params.append('token', authToken);
+    
+    // Optional parameters
+    if (userEmail) params.append('email', userEmail);
+    if (segment) params.append('segment', segment);
+    if (branchId) params.append('branchId', branchId);
+
+    // 2FA parameters
+    if (is2FaEnabled) {
+      params.append('is2FaEnabled', 'true');
+      if (dob) params.append('dob', dob);
+      if (organizationId) params.append('organizationId', organizationId);
+      if (partnerUserId) params.append('partnerUserId', partnerUserId);
+      if (firstName) params.append('firstName', firstName);
+      if (lastName) params.append('lastName', lastName);
+    }
     
     return `${baseUrl}?${params.toString()}`;
-  }, [authData]);
+  }, [
+    authToken, 
+    userEmail, 
+    segment, 
+    branchId, 
+    is2FaEnabled,
+    dob,
+    organizationId,
+    partnerUserId,
+    firstName,
+    lastName
+  ]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="spinner mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center text-red-600">
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!webviewUrl) {
+    return <div>Failed to authenticate</div>;
+  }
 
   return (
-    <div className="webview-container">
+    <div className="webview-container h-screen w-full">
       <iframe
         src={webviewUrl}
         className="h-full w-full"
@@ -85,21 +198,34 @@ export default WebviewWithQueryParams;
 import WebviewWithQueryParams from './WebviewWithQueryParams';
 
 function App() {
-  const authData = {
-    token: "user_token_123",
-    email: "user@example.com",
-    firstName: "John",
-    lastName: "Doe",
-    partnerUserId: "partner_123",
-    pathId: "path_456",
-    segment: "premium",
-    branchId: "branch_789",
-  };
-
   return (
     <div className="app">
       <h1>My Application</h1>
-      <WebviewWithQueryParams authData={authData} />
+      <WebviewWithQueryParams 
+        userEmail="user@example.com"
+        segment="premium"
+        branchId="branch_789"
+      />
+    </div>
+  );
+}
+
+// With 2FA enabled
+function AppWith2FA() {
+  return (
+    <div className="app">
+      <h1>My Application</h1>
+      <WebviewWithQueryParams 
+        userEmail="user@example.com"
+        segment="premium"
+        branchId="branch_789"
+        is2FaEnabled={true}
+        dob="1990-01-15"
+        organizationId="org_123"
+        partnerUserId="partner_123"
+        firstName="John"
+        lastName="Doe"
+      />
     </div>
   );
 }
@@ -109,45 +235,236 @@ function App() {
 
 ### Parent Window
 ```javascript
-// Define your auth data
-const authData = {
-  token: "user_token_123",
-  email: "user@example.com",
-  firstName: "John",
-  lastName: "Doe",
-  partnerUserId: "partner_123",
-  pathId: "path_456",
-  segment: "premium",
-  branchId: "branch_789",
+// Configuration
+const config = {
+  doshiEmbedUrl: 'https://embed.doshi.app',
+  backendUrl: '/api/generate-doshi-token'
 };
 
-// Build URL with query parameters
-function buildWebviewUrl(baseUrl, data) {
-  const params = new URLSearchParams();
-  
-  // Add non-empty values to query params
-  Object.entries(data).forEach(([key, value]) => {
-    if (value) {
-      params.append(key, value);
+// User data
+const userData = {
+  email: "user@example.com",
+  segment: "premium",
+  branchId: "branch_789"
+};
+
+// 2FA data (optional)
+const twoFactorData = {
+  is2FaEnabled: true,
+  dob: "1990-01-15",
+  organizationId: "org_123",
+  partnerUserId: "partner_123",
+  firstName: "John",
+  lastName: "Doe"
+};
+
+// Step 1: Get nonce token from your backend
+async function fetchAuthToken() {
+  try {
+    const response = await fetch(config.backendUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: userData.email,
+        branchId: userData.branchId
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate token');
     }
-  });
-  
-  return `${baseUrl}?${params.toString()}`;
+
+    const data = await response.json();
+    return data.token;
+  } catch (error) {
+    console.error('Failed to fetch auth token:', error);
+    showError('Authentication failed. Please try again.');
+    return null;
+  }
 }
 
-// Create and add webview to the page
-const webview = document.createElement("iframe");
-webview.src = buildWebviewUrl("https://embed.doshi.app", authData);
-webview.className = "h-full w-full";
-webview.frameBorder = "0";
-webview.allowFullscreen = true;
+// Step 2: Build URL with query parameters
+function buildWebviewUrl(token, userData, twoFactorData) {
+  const params = new URLSearchParams();
+  
+  // Required
+  params.append('token', token);
+  
+  // Optional parameters
+  if (userData.email) params.append('email', userData.email);
+  if (userData.segment) params.append('segment', userData.segment);
+  if (userData.branchId) params.append('branchId', userData.branchId);
 
-document.querySelector("#your-container-id").appendChild(webview);
+  // 2FA parameters
+  if (twoFactorData.is2FaEnabled) {
+    params.append('is2FaEnabled', 'true');
+    if (twoFactorData.dob) params.append('dob', twoFactorData.dob);
+    if (twoFactorData.organizationId) {
+      params.append('organizationId', twoFactorData.organizationId);
+    }
+    if (twoFactorData.partnerUserId) {
+      params.append('partnerUserId', twoFactorData.partnerUserId);
+    }
+    if (twoFactorData.firstName) {
+      params.append('firstName', twoFactorData.firstName);
+    }
+    if (twoFactorData.lastName) {
+      params.append('lastName', twoFactorData.lastName);
+    }
+  }
+  
+  return `${config.doshiEmbedUrl}?${params.toString()}`;
+}
+
+// Step 3: Create and add webview to the page
+async function createDoshiEmbed() {
+  // Show loading state
+  showLoading();
+
+  // Get token
+  const token = await fetchAuthToken();
+  if (!token) return;
+
+  // Build URL
+  const webviewUrl = buildWebviewUrl(token, userData, twoFactorData);
+
+  // Create iframe
+  const webview = document.createElement("iframe");
+  webview.src = webviewUrl;
+  webview.className = "h-full w-full";
+  webview.frameBorder = "0";
+  webview.allowFullscreen = true;
+
+  // Add load event listener
+  webview.addEventListener('load', () => {
+    console.log('Doshi embed loaded successfully');
+    hideLoading();
+  });
+
+  webview.addEventListener('error', () => {
+    console.error('Failed to load Doshi embed');
+    showError('Failed to load authentication. Please try again.');
+  });
+
+  // Add to page
+  const container = document.querySelector("#doshi-container");
+  container.innerHTML = ''; // Clear any existing content
+  container.appendChild(webview);
+}
+
+// UI Helper functions
+function showLoading() {
+  const container = document.querySelector("#doshi-container");
+  container.innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+  `;
+}
+
+function hideLoading() {
+  // Loading is automatically hidden when iframe loads
+}
+
+function showError(message) {
+  const container = document.querySelector("#doshi-container");
+  container.innerHTML = `
+    <div class="error-message">
+      <p>${message}</p>
+      <button onclick="createDoshiEmbed()">Retry</button>
+    </div>
+  `;
+}
+
+// Initialize
+createDoshiEmbed();
 ```
 
-## Child Window (Webview) Implementation
+### HTML Structure
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doshi Integration</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
 
-### Reading Query Parameters
+    #doshi-container {
+      width: 100%;
+      height: 100vh;
+      position: relative;
+    }
+    
+    .loading-state,
+    .error-message {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .error-message {
+      color: #dc2626;
+    }
+
+    .error-message button,
+    .loading-state button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .error-message button:hover,
+    .loading-state button:hover {
+      background-color: #2563eb;
+    }
+  </style>
+</head>
+<body>
+  <div id="doshi-container"></div>
+  <script src="doshi-integration.js"></script>
+</body>
+</html>
+```
+
+## Child Window (Webview) - Reading Query Parameters
+
+<Note>
+  This section is for reference only. The Doshi iframe already implements this functionality.
+</Note>
+
+### Reading Parameters
 ```javascript
 // Inside the webview, extract query parameters
 function getAuthDataFromUrl() {
@@ -156,12 +473,15 @@ function getAuthDataFromUrl() {
   return {
     token: params.get('token') || '',
     email: params.get('email') || '',
-    firstName: params.get('firstName') || '',
-    lastName: params.get('lastName') || '',
-    partnerUserId: params.get('partnerUserId') || '',
-    pathId: params.get('pathId') || '',
     segment: params.get('segment') || '',
     branchId: params.get('branchId') || '',
+    // 2FA parameters
+    is2FaEnabled: params.get('is2FaEnabled') === 'true',
+    dob: params.get('dob') || '',
+    organizationId: params.get('organizationId') || '',
+    partnerUserId: params.get('partnerUserId') || '',
+    firstName: params.get('firstName') || '',
+    lastName: params.get('lastName') || ''
   };
 }
 
@@ -169,10 +489,15 @@ function getAuthDataFromUrl() {
 const authData = getAuthDataFromUrl();
 console.log('Authenticated user:', authData.email);
 
-// Validate data
-if (!authData.token || !authData.email) {
-  console.error('Missing required authentication data');
-  // Handle authentication failure
+// Validate required data
+if (!authData.token) {
+  console.error('Missing required authentication token');
+  showError('Authentication token missing');
+}
+
+// If 2FA is enabled, show OTP screen
+if (authData.is2FaEnabled) {
+  handle2FAFlow(authData);
 }
 ```
 
@@ -194,33 +519,11 @@ function clearUrlParams() {
 // Extract auth data
 const authData = getAuthDataFromUrl();
 
-// Store in memory or secure storage
-sessionStorage.setItem('authToken', authData.token);
+// Store in memory
+window.authData = authData;
 
-// Clear URL
+// Clear URL (optional, for security)
 clearUrlParams();
-```
-
-## Advanced: Selective Parameter Clearing
-
-Clear only sensitive parameters while keeping others:
-```javascript
-function clearSensitiveParams(sensitiveKeys = ['token', 'password']) {
-  if (window.history.replaceState) {
-    const url = new URL(window.location.href);
-    const params = new URLSearchParams(url.search);
-    
-    // Remove sensitive parameters
-    sensitiveKeys.forEach(key => params.delete(key));
-    
-    // Update URL with remaining params
-    url.search = params.toString();
-    window.history.replaceState({}, document.title, url.toString());
-  }
-}
-
-// Example: Keep non-sensitive params like pathId and segment
-clearSensitiveParams(['token', 'email', 'firstName', 'lastName', 'partnerUserId']);
 ```
 
 ## URL Encoding
@@ -231,9 +534,9 @@ function buildSecureUrl(baseUrl, data) {
   const params = new URLSearchParams();
   
   Object.entries(data).forEach(([key, value]) => {
-    if (value) {
+    if (value !== null && value !== undefined && value !== '') {
       // URLSearchParams automatically encodes values
-      params.append(key, value);
+      params.append(key, String(value));
     }
   });
   
@@ -241,135 +544,59 @@ function buildSecureUrl(baseUrl, data) {
   
   // Check URL length
   if (url.length > 2000) {
-    console.warn('URL exceeds recommended length');
+    console.warn('URL exceeds recommended length. Consider using postMessage.');
   }
   
   return url;
 }
 ```
 
-## Combined Approach
-
-Use both postMessage and query parameters for maximum flexibility:
-```tsx
-import React, { useEffect, useState, useMemo } from "react";
-
-interface Props {
-  authData: AuthData;
-  useQueryParams?: boolean; // Toggle between methods
-}
-
-const FlexibleWebview: React.FC<Props> = ({ 
-  authData, 
-  useQueryParams = false 
-}) => {
-  const [isLoadingAuth, setIsLoadingAuth] = useState(false);
-
-  // Build URL with query params if needed
-  const webviewUrl = useMemo(() => {
-    const baseUrl = "https://embed.doshi.app";
-    
-    if (!useQueryParams) {
-      return baseUrl;
-    }
-    
-    const params = new URLSearchParams();
-    Object.entries(authData).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-    
-    return `${baseUrl}?${params.toString()}`;
-  }, [authData, useQueryParams]);
-
-  // postMessage handler
-  useEffect(() => {
-    if (useQueryParams) return; // Skip if using query params
-    
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data =
-          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-
-        if (data.type === "PING") {
-          handleSendAuth();
-        }
-      } catch (error) {
-        console.error("Error processing message:", error);
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [useQueryParams]);
-
-  const handleSendAuth = async () => {
-    setIsLoadingAuth(true);
-
-    const filteredAuthData = Object.fromEntries(
-      Object.entries(authData).filter(([_, value]) => value !== "")
-    );
-
-    const webview = document.querySelector("iframe");
-    if (webview && webview.contentWindow) {
-      webview.contentWindow.postMessage(
-        JSON.stringify({
-          ...filteredAuthData,
-          type: "AUTH",
-        }),
-        "*"
-      );
-    }
-
-    setIsLoadingAuth(false);
-  };
-
-  return (
-    <div className="webview-container">
-      <iframe
-        src={webviewUrl}
-        className="h-full w-full"
-        frameBorder="0"
-        allowFullScreen
-      />
-    </div>
-  );
-};
-
-export default FlexibleWebview;
-```
-
 ## URL Parameter Reference
 
+### Required Parameters
+
 <ParamField query="token" type="string" required>
-  User authentication token
+  The nonce token received from the Doshi API
 </ParamField>
 
-<ParamField query="email" type="string" required>
-  User email address
-</ParamField>
+### Optional Parameters
 
-<ParamField query="firstName" type="string">
-  User's first name
-</ParamField>
-
-<ParamField query="lastName" type="string">
-  User's last name
-</ParamField>
-
-<ParamField query="partnerUserId" type="string">
-  Partner-specific user identifier
-</ParamField>
-
-<ParamField query="pathId" type="string">
-  Path or journey identifier
+<ParamField query="email" type="string">
+  User's email address
 </ParamField>
 
 <ParamField query="segment" type="string">
-  User segment classification
+  Used for handling multiple learning paths under the same organization
 </ParamField>
 
 <ParamField query="branchId" type="string">
   Branch or location identifier
+</ParamField>
+
+### 2FA Parameters
+
+<ParamField query="is2FaEnabled" type="boolean">
+  Set to `true` to enable 2FA flow in the iframe
+</ParamField>
+
+<ParamField query="dob" type="string">
+  User's date of birth in YYYY-MM-DD format (required for 2FA)
+</ParamField>
+
+<ParamField query="organizationId" type="string">
+  Your organization ID (required for 2FA)
+</ParamField>
+
+<ParamField query="partnerUserId" type="string">
+  Your internal user ID (required for 2FA)
+</ParamField>
+
+<ParamField query="firstName" type="string">
+  User's first name (required for 2FA)
+</ParamField>
+
+<ParamField query="lastName" type="string">
+  User's last name (required for 2FA)
 </ParamField>
 
 ## Comparison: postMessage vs Query Parameters
@@ -381,7 +608,53 @@ export default FlexibleWebview;
 | **Real-time** | No | Yes |
 | **URL Length** | Limited (~2000 chars) | No limit |
 | **Debugging** | Easy (visible in URL) | Requires dev tools |
-| **Best For** | Simple auth, one-time setup | Sensitive data, dynamic flows |
+| **2FA Support** | Yes | Yes |
+| **Best For** | Simple auth, quick setup | Sensitive data, production apps |
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="URL too long">
+    **Problem:** URL exceeds browser limits (typically 2000 characters).
+
+    **Solutions:**
+    1. Use shorter tokens or references
+    2. Switch to postMessage method
+    3. Only include essential parameters
+  </Accordion>
+
+  <Accordion title="Special characters not encoding properly">
+    **Problem:** Special characters in parameters causing issues.
+
+    **Solution:**
+```javascript
+    // Use URLSearchParams for automatic encoding
+    const params = new URLSearchParams();
+    params.append('email', 'user+test@example.com'); // Properly encoded
+    params.append('name', 'John & Jane'); // Properly encoded
+```
+  </Accordion>
+
+  <Accordion title="Parameters not being read">
+    **Problem:** Query parameters not accessible in the webview.
+
+    **Solution:**
+```javascript
+    // Debug parameter reading
+    console.log('Current URL:', window.location.href);
+    console.log('Search params:', window.location.search);
+    
+    const params = new URLSearchParams(window.location.search);
+    console.log('All params:', Object.fromEntries(params));
+    
+    // Check for specific param
+    const token = params.get('token');
+    if (!token) {
+      console.error('Token parameter missing from URL');
+    }
+```
+  </Accordion>
+</AccordionGroup>
 
 ## Next Steps
 

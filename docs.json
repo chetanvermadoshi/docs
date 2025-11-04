@@ -19,6 +19,7 @@
       {
         "tab": "Webview",
          "pages": [
+          "webview/quickstart",
           "webview/introduction",
           "webview/security",
           "webview/postmessage",

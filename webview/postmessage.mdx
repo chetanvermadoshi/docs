@@ -10,6 +10,9 @@ The postMessage API provides secure, real-time cross-origin communication betwee
 ## How It Works
 
 <Steps>
+  <Step title="Generate Nonce Token">
+    Your backend calls the Doshi API to generate a nonce token
+  </Step>
   <Step title="Webview Sends PING">
     The embedded webview sends a PING message to signal it's ready
   </Step>
@@ -17,28 +20,53 @@ The postMessage API provides secure, real-time cross-origin communication betwee
     Parent window listens for the PING and prepares authentication data
   </Step>
   <Step title="Parent Sends AUTH">
-    Parent sends authentication data back to the webview
+    Parent sends the nonce token and user data back to the webview
   </Step>
   <Step title="Webview Processes AUTH">
-    Webview receives and processes the authentication data
+    Webview receives and processes the authentication, handling 2FA if needed
   </Step>
 </Steps>
 
+## TypeScript Interfaces
+```typescript
+interface AuthData {
+  token: string;              // Required - nonce token from API
+  email?: string;             // Optional - user's email
+  segment?: string;           // Optional - for multiple paths
+  branchId?: string;          // Optional - branch identifier
+  
+  // 2FA Parameters (optional, required when is2FaEnabled is true)
+  is2FaEnabled?: boolean;     // Enable 2FA flow in iframe
+  dob?: string;               // Date of birth (YYYY-MM-DD)
+  organizationId?: string;    // Organization ID
+  partnerUserId?: string;     // Partner user ID
+  firstName?: string;         // First name
+  lastName?: string;          // Last name
+}
+
+interface WebviewMessage {
+  type: string;
+  [key: string]: any;
+}
+```
+
 ## React Implementation
 
-### Parent Component
+### Complete Example with API Call
 ```tsx
 import React, { useEffect, useState } from "react";
 
 interface AuthData {
   token: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  partnerUserId: string;
-  pathId: string;
-  segment: string;
-  branchId: string;
+  email?: string;
+  segment?: string;
+  branchId?: string;
+  is2FaEnabled?: boolean;
+  dob?: string;
+  organizationId?: string;
+  partnerUserId?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 interface WebviewMessage {
@@ -47,16 +75,76 @@ interface WebviewMessage {
 }
 
 interface Props {
-  authData: AuthData;
+  userEmail: string;
+  segment?: string;
+  branchId?: string;
+  // 2FA props
+  is2FaEnabled?: boolean;
+  dob?: string;
+  organizationId?: string;
+  partnerUserId?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
-const WebviewComponent: React.FC<Props> = ({ authData }) => {
-  const [isLoadingAuth, setIsLoadingAuth] = useState(false);
+const WebviewComponent: React.FC<Props> = ({ 
+  userEmail,
+  segment,
+  branchId,
+  is2FaEnabled = false,
+  dob,
+  organizationId,
+  partnerUserId,
+  firstName,
+  lastName
+}) => {
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Step 1: Get nonce token from your backend
   useEffect(() => {
+    async function fetchToken() {
+      try {
+        // Call YOUR backend which securely calls Doshi API
+        const response = await fetch('/api/generate-doshi-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: userEmail,
+            branchId
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate token');
+        }
+
+        const data = await response.json();
+        setAuthToken(data.token);
+      } catch (error) {
+        console.error('Failed to fetch auth token:', error);
+        setError('Authentication failed. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchToken();
+  }, [userEmail, branchId]);
+
+  // Step 2: Setup postMessage listener
+  useEffect(() => {
+    if (!authToken) return;
+
     const handleMessage = (event: MessageEvent) => {
       // ✅ Verify origin in production
-      // if (event.origin !== 'https://embed.doshi.app') return;
+      if (event.origin !== 'https://embed.doshi.app') {
+        console.warn('Rejected message from:', event.origin);
+        return;
+      }
       
       try {
         const data: WebviewMessage =
@@ -73,33 +161,75 @@ const WebviewComponent: React.FC<Props> = ({ authData }) => {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [authToken]);
 
-  const handleSendAuth = async () => {
-    setIsLoadingAuth(true);
+  const handleSendAuth = () => {
+    if (!authToken) return;
 
-    // Filter out empty values from authData
-    const filteredAuthData = Object.fromEntries(
-      Object.entries(authData).filter(([_, value]) => value !== "")
-    );
+    // Build auth data object
+    const authData: AuthData = {
+      token: authToken,
+      type: "AUTH"
+    };
 
-    // Find the webview and send message
+    // Add optional fields
+    if (userEmail) authData.email = userEmail;
+    if (segment) authData.segment = segment;
+    if (branchId) authData.branchId = branchId;
+
+    // Add 2FA fields if enabled
+    if (is2FaEnabled) {
+      authData.is2FaEnabled = true;
+      if (dob) authData.dob = dob;
+      if (organizationId) authData.organizationId = organizationId;
+      if (partnerUserId) authData.partnerUserId = partnerUserId;
+      if (firstName) authData.firstName = firstName;
+      if (lastName) authData.lastName = lastName;
+    }
+
+    // Send to iframe
     const webview = document.querySelector("iframe");
     if (webview && webview.contentWindow) {
       webview.contentWindow.postMessage(
-        JSON.stringify({
-          ...filteredAuthData,
-          type: "AUTH",
-        }),
-        "*" // ⚠️ In production: "https://embed.doshi.app"
+        JSON.stringify(authData),
+        "https://embed.doshi.app" // ⚠️ Never use "*" in production
       );
     }
-
-    setIsLoadingAuth(false);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="spinner mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center text-red-600">
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authToken) {
+    return <div>Failed to authenticate</div>;
+  }
+
   return (
-    <div className="webview-container">
+    <div className="webview-container h-screen w-full">
       <iframe
         src="https://embed.doshi.app"
         className="h-full w-full"
@@ -118,21 +248,34 @@ export default WebviewComponent;
 import WebviewComponent from './WebviewComponent';
 
 function App() {
-  const authData = {
-    token: "user_token_123",
-    email: "user@example.com",
-    firstName: "John",
-    lastName: "Doe",
-    partnerUserId: "partner_123",
-    pathId: "path_456",
-    segment: "premium",
-    branchId: "branch_789",
-  };
-
   return (
     <div className="app">
       <h1>My Application</h1>
-      <WebviewComponent authData={authData} />
+      <WebviewComponent 
+        userEmail="user@example.com"
+        segment="premium"
+        branchId="branch_789"
+      />
+    </div>
+  );
+}
+
+// With 2FA enabled
+function AppWith2FA() {
+  return (
+    <div className="app">
+      <h1>My Application</h1>
+      <WebviewComponent 
+        userEmail="user@example.com"
+        segment="premium"
+        branchId="branch_789"
+        is2FaEnabled={true}
+        dob="1990-01-15"
+        organizationId="org_123"
+        partnerUserId="partner_123"
+        firstName="John"
+        lastName="Doe"
+      />
     </div>
   );
 }
@@ -142,74 +285,275 @@ function App() {
 
 ### Parent Window
 ```javascript
-// Define your auth data
-const authData = {
-  token: "user_token_123",
-  email: "user@example.com",
-  firstName: "John",
-  lastName: "Doe",
-  partnerUserId: "partner_123",
-  pathId: "path_456",
-  segment: "premium",
-  branchId: "branch_789",
+// Configuration
+const config = {
+  doshiEmbedUrl: 'https://embed.doshi.app',
+  backendUrl: '/api/generate-doshi-token'
 };
 
-// Create and add webview to the page
-const webview = document.createElement("iframe");
-webview.src = "https://embed.doshi.app";
-webview.className = "h-full w-full";
-webview.frameBorder = "0";
-webview.allowFullscreen = true;
+// User data
+const userData = {
+  email: "user@example.com",
+  segment: "premium",
+  branchId: "branch_789"
+};
 
-document.querySelector("#your-container-id").appendChild(webview);
+// 2FA data (optional)
+const twoFactorData = {
+  is2FaEnabled: true,
+  dob: "1990-01-15",
+  organizationId: "org_123",
+  partnerUserId: "partner_123",
+  firstName: "John",
+  lastName: "Doe"
+};
 
-// Handle messages from webview
+let authToken = null;
+
+// Step 1: Get nonce token from your backend
+async function fetchAuthToken() {
+  try {
+    const response = await fetch(config.backendUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: userData.email,
+        branchId: userData.branchId
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate token');
+    }
+
+    const data = await response.json();
+    authToken = data.token;
+    
+    // Create iframe after token is ready
+    createWebview();
+  } catch (error) {
+    console.error('Failed to fetch auth token:', error);
+    showError('Authentication failed. Please try again.');
+  }
+}
+
+// Step 2: Create and add webview to the page
+function createWebview() {
+  const webview = document.createElement("iframe");
+  webview.src = config.doshiEmbedUrl;
+  webview.className = "h-full w-full";
+  webview.frameBorder = "0";
+  webview.allowFullscreen = true;
+
+  document.querySelector("#doshi-container").appendChild(webview);
+  
+  // Setup message listener
+  setupMessageListener();
+}
+
+// Step 3: Handle messages from webview
+function setupMessageListener() {
+  window.addEventListener("message", handleMessage);
+  
+  // Cleanup on page unload
+  window.addEventListener("beforeunload", () => {
+    window.removeEventListener("message", handleMessage);
+  });
+}
+
 function handleMessage(event) {
   // ✅ Verify origin in production
-  // if (event.origin !== 'https://embed.doshi.app') return;
+  if (event.origin !== config.doshiEmbedUrl) {
+    console.warn('Rejected message from:', event.origin);
+    return;
+  }
   
   try {
-    const data =
-      typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+    const data = typeof event.data === "string" 
+      ? JSON.parse(event.data) 
+      : event.data;
 
     // When we receive PING from webview, send the auth data
     if (data.type === "PING") {
-      // Filter out empty values from authData
-      const filteredAuthData = Object.fromEntries(
-        Object.entries(authData).filter(([_, value]) => value !== "")
-      );
-
-      // Send auth data to webview
-      webview.contentWindow.postMessage(
-        JSON.stringify({
-          ...filteredAuthData,
-          type: "AUTH",
-        }),
-        "*" // ⚠️ In production: "https://embed.doshi.app"
-      );
+      sendAuthData();
+    } else if (data.type === "AUTH_SUCCESS") {
+      console.log('Authentication successful');
+      onAuthSuccess(data);
+    } else if (data.type === "AUTH_ERROR") {
+      console.error('Authentication failed:', data.error);
+      onAuthError(data.error);
     }
   } catch (error) {
     console.error("Error processing message:", error);
   }
 }
 
-// Add message listener
-window.addEventListener("message", handleMessage);
+// Step 4: Send auth data to webview
+function sendAuthData() {
+  if (!authToken) {
+    console.error('No auth token available');
+    return;
+  }
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  window.removeEventListener("message", handleMessage);
+  // Build auth data
+  const authData = {
+    token: authToken,
+    email: userData.email,
+    segment: userData.segment,
+    branchId: userData.branchId,
+    type: "AUTH"
+  };
+
+  // Add 2FA data if enabled
+  if (twoFactorData.is2FaEnabled) {
+    Object.assign(authData, twoFactorData);
+  }
+
+  // Send to webview
+  const webview = document.querySelector("iframe");
+  if (webview && webview.contentWindow) {
+    webview.contentWindow.postMessage(
+      JSON.stringify(authData),
+      config.doshiEmbedUrl // ⚠️ Never use "*" in production
+    );
+  }
+}
+
+// Callback functions
+function onAuthSuccess(data) {
+  console.log('User authenticated:', data);
+  // Hide loading indicator, update UI, etc.
+}
+
+function onAuthError(error) {
+  console.error('Authentication error:', error);
+  showError('Authentication failed. Please try again.');
+}
+
+function showError(message) {
+  const container = document.querySelector("#doshi-container");
+  container.innerHTML = `
+    <div class="error-message">
+      <p>${message}</p>
+      <button onclick="window.location.reload()">Retry</button>
+    </div>
+  `;
+}
+
+// Initialize
+fetchAuthToken();
+```
+
+### HTML Structure
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doshi Integration</title>
+  <style>
+    #doshi-container {
+      width: 100%;
+      height: 100vh;
+      position: relative;
+    }
+    
+    .error-message {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+    }
+    
+    .error-message button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="doshi-container"></div>
+  <script src="doshi-integration.js"></script>
+</body>
+</html>
+```
+
+## Backend Implementation
+
+Your backend should handle the API key securely:
+```typescript
+// backend/routes/auth.ts
+import express from 'express';
+
+const router = express.Router();
+
+router.post('/generate-doshi-token', async (req, res) => {
+  try {
+    // Verify user is authenticated in your system
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { email, branchId } = req.body;
+
+    // Call Doshi API with your API key
+    const response = await fetch(
+      'https://production-doshi-api-8kq2.encr.app/client/auth/token',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.DOSHI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email,
+          partnerUserId: req.session.userId,
+          branchId
+        })
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Doshi API request failed');
+    }
+
+    const data = await response.json();
+    
+    // Log for security monitoring
+    console.log(`Generated token for user ${req.session.userId}`);
+    
+    res.json({ token: data.token });
+  } catch (error) {
+    console.error('Error generating Doshi token:', error);
+    res.status(500).json({ error: 'Failed to generate authentication token' });
+  }
 });
+
+export default router;
 ```
 
 ## Child Window (Webview) Implementation
+
+<Note>
+  This section is for reference only. The Doshi iframe already implements this functionality.
+</Note>
 
 ### Sending PING
 ```javascript
 // Inside the webview, send PING to parent when ready
 window.parent.postMessage(
   JSON.stringify({ type: "PING" }),
-  "*" // ⚠️ In production: specify parent origin
+  "*" // ⚠️ In production: specify parent origin if known
 );
 ```
 
@@ -227,51 +571,79 @@ window.addEventListener("message", (event) => {
     
     if (data.type === "AUTH") {
       // Process authentication data
-      const { token, email, firstName, lastName, partnerUserId } = data;
+      const { 
+        token, 
+        email, 
+        segment, 
+        branchId,
+        is2FaEnabled,
+        dob,
+        organizationId,
+        partnerUserId,
+        firstName,
+        lastName
+      } = data;
       
-      // Store token for API calls
-      localStorage.setItem('authToken', token);
+      // Authenticate user with token
+      await authenticateUser(token);
       
-      // Update UI with user info
-      console.log(`Authenticated user: ${firstName} ${lastName}`);
+      // If 2FA is enabled, show OTP screen
+      if (is2FaEnabled) {
+        await handle2FAFlow({
+          dob,
+          organizationId,
+          partnerUserId,
+          firstName,
+          lastName
+        });
+      }
       
-      // Initialize your application
-      initializeApp(data);
+      // Notify parent of success
+      window.parent.postMessage(
+        JSON.stringify({ 
+          type: "AUTH_SUCCESS",
+          userId: user.id 
+        }),
+        event.origin
+      );
     }
   } catch (error) {
     console.error("Error processing auth message:", error);
+    
+    // Notify parent of error
+    window.parent.postMessage(
+      JSON.stringify({ 
+        type: "AUTH_ERROR",
+        error: error.message 
+      }),
+      event.origin
+    );
   }
 });
-
-function initializeApp(authData) {
-  // Your app initialization logic
-  console.log('App initialized with auth data:', authData);
-}
 ```
 
 ## Advanced: Retry Logic
 
 Add retry logic for more robust authentication:
 ```typescript
-const WebviewWithRetry: React.FC<Props> = ({ authData }) => {
+const WebviewWithRetry: React.FC<Props> = ({ userEmail }) => {
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000; // 2 seconds
 
   const handleSendAuth = async () => {
     try {
-      const filteredAuthData = Object.fromEntries(
-        Object.entries(authData).filter(([_, value]) => value !== "")
-      );
+      const authData = {
+        token: authToken,
+        email: userEmail,
+        type: "AUTH"
+      };
 
       const webview = document.querySelector("iframe");
       if (webview && webview.contentWindow) {
         webview.contentWindow.postMessage(
-          JSON.stringify({
-            ...filteredAuthData,
-            type: "AUTH",
-          }),
-          "*"
+          JSON.stringify(authData),
+          "https://embed.doshi.app"
         );
       } else {
         throw new Error("Webview not found");
@@ -280,10 +652,13 @@ const WebviewWithRetry: React.FC<Props> = ({ authData }) => {
       console.error("Error sending auth:", error);
       
       if (retryCount < MAX_RETRIES) {
+        console.log(`Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
         setTimeout(() => {
           setRetryCount(retryCount + 1);
           handleSendAuth();
         }, RETRY_DELAY);
+      } else {
+        setError('Failed to authenticate after multiple attempts');
       }
     }
   };
@@ -298,27 +673,69 @@ const WebviewWithRetry: React.FC<Props> = ({ authData }) => {
   The message type identifier
 
   <Expandable title="Available Types">
+    **From Iframe to Parent:**
     - `PING`: Sent by webview to signal readiness
+    - `AUTH_SUCCESS`: Authentication completed successfully
+    - `AUTH_ERROR`: Authentication failed
+    
+    **From Parent to Iframe:**
     - `AUTH`: Sent by parent with authentication data
-    - Custom types: You can define your own message types
   </Expandable>
 </ParamField>
 
-## Testing
+## Testing postMessage Flow
 ```javascript
-// Test PING/PONG flow
-function testPostMessage() {
-  const testData = {
-    type: "PING"
-  };
+// Test the authentication flow
+function testPostMessageFlow() {
+  console.log('Testing postMessage flow...');
   
-  window.postMessage(JSON.stringify(testData), "*");
+  // Simulate PING from iframe
+  window.postMessage(
+    JSON.stringify({ type: "PING" }),
+    window.location.origin
+  );
   
+  // Listen for AUTH response
   window.addEventListener("message", (event) => {
-    console.log("Received message:", event.data);
+    const data = JSON.parse(event.data);
+    console.log("Received message:", data);
+    
+    if (data.type === "AUTH") {
+      console.log("✅ AUTH message received");
+      console.log("Token:", data.token);
+      console.log("Email:", data.email);
+    }
   });
 }
 ```
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Messages not being received">
+    **Solutions:**
+    1. Check that origin validation matches exactly
+    2. Verify iframe has loaded before sending messages
+    3. Ensure JSON.stringify is used when sending data
+    4. Check browser console for errors
+  </Accordion>
+
+  <Accordion title="Token not available">
+    **Solutions:**
+    1. Ensure backend API call completed successfully
+    2. Check network tab for API response
+    3. Verify error handling in token fetch logic
+    4. Check that API key is valid
+  </Accordion>
+
+  <Accordion title="2FA not triggering">
+    **Solutions:**
+    1. Verify `is2FaEnabled` is set to `true`
+    2. Ensure all required 2FA fields are provided
+    3. Check that organization has 2FA enabled
+    4. Verify user phone number is registered
+  </Accordion>
+</AccordionGroup>
 
 ## Next Steps
 

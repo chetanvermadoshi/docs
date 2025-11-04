@@ -7,10 +7,59 @@ description: "Essential security guidelines for webview authentication"
 
 Security is paramount when implementing webview authentication. This guide covers critical security considerations for both postMessage and query parameter methods.
 
+## API Key Security
+
+<Warning>
+  **Never expose your API key in client-side code**. Always call the Doshi API from your backend server.
+</Warning>
+
+### Secure API Key Usage
+```typescript
+// ❌ NEVER do this - API key exposed in frontend
+const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/token', {
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY'  // Exposed to users!
+  }
+});
+
+// ✅ Correct - Call your backend which securely stores the API key
+const response = await fetch('https://your-backend.com/api/generate-doshi-token', {
+  method: 'POST',
+  body: JSON.stringify({ userId: 'user_123' })
+});
+```
+
+### Backend Implementation Example
+```typescript
+// Your backend server
+app.post('/api/generate-doshi-token', async (req, res) => {
+  // Verify the user is authenticated in your system
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Call Doshi API with your API key (stored securely in environment variables)
+  const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/token', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.DOSHI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      email: req.user.email,
+      partnerUserId: req.user.id
+    })
+  });
+
+  const data = await response.json();
+  res.json({ token: data.token });
+});
+```
+
 ## Origin Verification
 
 <Warning>
-  Always verify the origin of messages and requests in production environments
+  Always verify the origin of messages in production environments
 </Warning>
 
 ### For postMessage
@@ -35,6 +84,33 @@ webview.contentWindow.postMessage(data, "*");
 webview.contentWindow.postMessage(data, "https://embed.doshi.app");
 ```
 
+## Token Security
+
+### Token Lifecycle
+
+The nonce token received from the API:
+- Is single-use for initial authentication
+- Has a short expiration time
+- Cannot be reused after the user session is established
+```typescript
+// After getting the token, use it immediately
+const { token } = await getTokenFromBackend();
+
+// Pass to iframe right away
+passTokenToIframe(token);
+
+// Don't store the token for long periods
+// Don't reuse the token for multiple sessions
+```
+
+### Session Tokens
+
+Once authenticated:
+- **ID Token TTL**: 1 hour
+- **Refresh Token TTL**: 12 hours
+- The iframe manages token refresh automatically
+- Sessions are isolated per iframe instance
+
 ## Cross-Origin Communication
 
 ### postMessage API Security
@@ -51,6 +127,12 @@ webview.contentWindow.postMessage(data, "https://embed.doshi.app");
       // Validate message structure
       if (!data.type || typeof data.type !== 'string') {
         throw new Error('Invalid message structure');
+      }
+      
+      // Validate expected message types
+      const validTypes = ['PING', 'AUTH', 'AUTH_SUCCESS', 'AUTH_ERROR'];
+      if (!validTypes.includes(data.type)) {
+        throw new Error(`Unexpected message type: ${data.type}`);
       }
       
       // Process valid message
@@ -97,48 +179,56 @@ webview.contentWindow.postMessage(data, "https://embed.doshi.app");
 ## Query Parameter Security
 
 <Warning>
-  Query parameters are visible in URLs and browser history. Use with caution for sensitive data.
+  Query parameters are visible in URLs and browser history. The nonce token is short-lived but still sensitive.
 </Warning>
 
 ### Best Practices
 
-1. **Sanitize All Parameters**
+1. **Clear Parameters After Use**
 ```javascript
-function sanitizeParam(value) {
-  if (!value) return '';
-  
-  // Remove potentially dangerous characters
-  return value
-    .replace(/[<>\"']/g, '')
-    .trim();
-}
-
-const authData = {
-  token: sanitizeParam(params.get('token')),
-  email: sanitizeParam(params.get('email')),
-  // ... other fields
-};
+// After iframe loads, clear sensitive params
+window.addEventListener('load', () => {
+  if (window.history.replaceState) {
+    const url = new URL(window.location.href);
+    url.search = ''; // Clear all query params
+    window.history.replaceState({}, document.title, url.toString());
+  }
+});
 ```
 
 2. **Use Short-Lived Tokens**
-```javascript
-// Generate a temporary token with expiration
-const temporaryToken = generateToken({
-  userId: user.id,
-  expiresIn: '5m' // 5 minutes
-});
 
-const webviewUrl = `https://embed.doshi.app?token=${temporaryToken}`;
+The nonce token from the API is already short-lived, but you can add additional validation:
+```typescript
+// Backend - add timestamp to token generation
+const tokenData = {
+  email: user.email,
+  timestamp: Date.now()
+};
+
+// Frontend - check token age before using
+const isTokenFresh = (timestamp: number) => {
+  const maxAge = 5 * 60 * 1000; // 5 minutes
+  return Date.now() - timestamp < maxAge;
+};
 ```
 
-3. **Clear Sensitive Parameters**
-```javascript
-// After reading parameters, clear them from URL
-if (window.history.replaceState) {
-  const url = new URL(window.location.href);
-  url.search = ''; // Clear all query params
-  window.history.replaceState({}, document.title, url.toString());
-}
+3. **Monitor Token Usage**
+```typescript
+// Log token usage for security monitoring
+app.post('/api/generate-doshi-token', async (req, res) => {
+  const token = await generateDoshiToken(req.user);
+  
+  // Log token generation
+  await logSecurityEvent({
+    event: 'token_generated',
+    userId: req.user.id,
+    timestamp: new Date(),
+    ip: req.ip
+  });
+  
+  res.json({ token });
+});
 ```
 
 4. **Respect URL Length Limits**
@@ -147,14 +237,9 @@ if (window.history.replaceState) {
   URLs should generally stay under 2000 characters for maximum browser compatibility
 </Note>
 ```javascript
-function buildWebviewUrl(baseUrl, data) {
-  const params = new URLSearchParams();
-  
-  Object.entries(data).forEach(([key, value]) => {
-    if (value) params.append(key, value);
-  });
-  
-  const fullUrl = `${baseUrl}?${params.toString()}`;
+function buildWebviewUrl(baseUrl, params) {
+  const urlParams = new URLSearchParams(params);
+  const fullUrl = `${baseUrl}?${urlParams.toString()}`;
   
   // Check URL length
   if (fullUrl.length > 2000) {
@@ -165,13 +250,52 @@ function buildWebviewUrl(baseUrl, data) {
 }
 ```
 
+## 2FA Security
+
+When implementing 2FA:
+```typescript
+// Only pass 2FA parameters when explicitly enabled
+const authData = {
+  token: nonceToken,
+  email: user.email,
+  // Only include these if 2FA is actually enabled
+  ...(is2FaEnabled && {
+    is2FaEnabled: true,
+    dob: user.dob,
+    organizationId: org.id,
+    partnerUserId: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName
+  })
+};
+```
+
+### Don't Send Unnecessary Data
+```typescript
+// ❌ Don't send sensitive data if not needed
+const authData = {
+  token: nonceToken,
+  ssn: user.ssn,  // Never send unless absolutely required
+  password: user.password  // Never send passwords
+};
+
+// ✅ Only send required fields
+const authData = {
+  token: nonceToken,
+  email: user.email,
+  segment: 'premium'
+};
+```
+
 ## Security Checklist
 
+<Check>Store API key securely in backend environment variables</Check>
+<Check>Never expose API key in client-side code</Check>
+<Check>Call Doshi API only from your backend server</Check>
 <Check>Use HTTPS for all communication</Check>
 <Check>Verify message origins in production</Check>
 <Check>Never use "*" wildcard for target origins in production</Check>
 <Check>Validate all incoming messages and parameters</Check>
-<Check>Sanitize user input</Check>
 <Check>Use short-lived tokens</Check>
 <Check>Clear sensitive data from URLs after reading</Check>
 <Check>Implement comprehensive error handling</Check>
@@ -182,11 +306,65 @@ function buildWebviewUrl(baseUrl, data) {
 
 | Pitfall | Risk | Solution |
 |---------|------|----------|
+| API key in frontend | Anyone can steal your key | Call API from backend only |
 | Using `"*"` for postMessage target | Any site can receive messages | Specify exact origin |
-| Sensitive tokens in URLs | Exposed in logs/history | Use postMessage or temporary tokens |
+| Sensitive tokens in URLs | Exposed in logs/history | Use postMessage or clear params |
 | No origin verification | Malicious sites can send messages | Always check `event.origin` |
-| Missing input validation | XSS vulnerabilities | Sanitize all inputs |
+| Missing input validation | XSS vulnerabilities | Validate all inputs |
 | Long-lived tokens | Increased attack window | Use short expiration times |
+| Storing tokens in localStorage | XSS attacks can steal tokens | Let iframe manage sessions |
+
+## Environment-Specific Configuration
+```typescript
+// config.ts
+const config = {
+  development: {
+    doshiApiUrl: 'https://sandbox.api.doshi.app',
+    doshiEmbedUrl: 'https://staging-embed.doshi.app',
+    strictOriginCheck: false  // For local testing
+  },
+  production: {
+    doshiApiUrl: 'https://production-doshi-api-8kq2.encr.app',
+    doshiEmbedUrl: 'https://embed.doshi.app',
+    strictOriginCheck: true
+  }
+};
+
+// Use environment-specific config
+const env = process.env.NODE_ENV || 'development';
+export default config[env];
+```
+
+## Monitoring and Logging
+```typescript
+// Log security-relevant events
+const logSecurityEvent = async (event: SecurityEvent) => {
+  await logger.log({
+    level: 'security',
+    event: event.type,
+    userId: event.userId,
+    ip: event.ip,
+    timestamp: new Date(),
+    metadata: event.metadata
+  });
+};
+
+// Monitor for suspicious activity
+app.post('/api/generate-doshi-token', async (req, res) => {
+  // Rate limiting
+  const recentTokens = await getRecentTokensForUser(req.user.id);
+  if (recentTokens.length > 10) {
+    await logSecurityEvent({
+      type: 'excessive_token_generation',
+      userId: req.user.id,
+      ip: req.ip
+    });
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+  
+  // Generate token...
+});
+```
 
 ## Next Steps
 
