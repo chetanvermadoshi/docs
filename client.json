@@ -38,7 +38,7 @@
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Authentication token provided by the auth endpoints."
+        "description": "Authentication token (API Key) provided by Doshi. Your server's IP address must be whitelisted to use this API. Contact hello@doshi.app to whitelist your IPs."
       }
     },
     "schemas": {
