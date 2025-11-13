@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://production-doshi-api-8kq2.encr.app",
+      "url": "https://api.doshi.app",
       "description": "Production server"
     },
     {
