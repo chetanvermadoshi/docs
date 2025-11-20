@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://embed.v2.doshi.app",
+      "url": "https://api.doshi.app",
       "description": "Production server"
     },
     {
