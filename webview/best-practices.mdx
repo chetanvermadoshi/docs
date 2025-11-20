@@ -14,7 +14,7 @@ description: "Optimization tips and best practices for webview authentication"
 // ✅ Correct - Backend handles API key
 // backend/api/auth.ts
 app.post('/generate-doshi-token', async (req, res) => {
-  const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/token', {
+  const response = await fetch('https://api.doshi.app/client/auth/token', {
     headers: {
       'Authorization': `Bearer ${process.env.DOSHI_API_KEY}`
     }
@@ -24,7 +24,7 @@ app.post('/generate-doshi-token', async (req, res) => {
 
 // ❌ Never do this - API key exposed
 // frontend/app.tsx
-const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/token', {
+const response = await fetch('https://api.doshi.app/client/auth/token', {
   headers: {
     'Authorization': 'Bearer sk_live_abc123...' // EXPOSED!
   }
@@ -37,7 +37,7 @@ Store your API key securely:
 ```bash
 # .env
 DOSHI_API_KEY=your_api_key_here
-DOSHI_API_URL=https://production-doshi-api-8kq2.encr.app
+DOSHI_API_URL=https://api.doshi.app
 ```
 ```typescript
 // config.ts
@@ -55,11 +55,11 @@ export const config = {
 ### Always Use HTTPS
 ```javascript
 // ✅ Correct
-const webviewUrl = "https://embed.doshi.app";
-const apiUrl = "https://production-doshi-api-8kq2.encr.app";
+const webviewUrl = "https://embed.v2.doshi.app";
+const apiUrl = "https://api.doshi.app";
 
 // ❌ Never use HTTP in production
-const insecureUrl = "http://embed.doshi.app";
+const insecureUrl = "http://embed.v2.doshi.app";
 ```
 
 ### Implement Proper Origin Checks
@@ -67,7 +67,7 @@ const insecureUrl = "http://embed.doshi.app";
 // For postMessage
 window.addEventListener("message", (event) => {
   // ✅ Always verify origin in production
-  if (event.origin !== 'https://embed.doshi.app') {
+  if (event.origin !== 'https://embed.v2.doshi.app') {
     console.warn('Rejected message from:', event.origin);
     return;
   }
@@ -82,7 +82,7 @@ window.addEventListener("message", (event) => {
 webview.contentWindow.postMessage(data, "*");
 
 // ✅ Production - always specify exact origin
-webview.contentWindow.postMessage(data, "https://embed.doshi.app");
+webview.contentWindow.postMessage(data, "https://embed.v2.doshi.app");
 ```
 
 ### Validate All Data
