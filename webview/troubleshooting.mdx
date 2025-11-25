@@ -530,6 +530,125 @@ description: "Common issues and solutions for webview authentication"
   </Accordion>
 </AccordionGroup>
 
+### Mobile WebView Issues
+
+<AccordionGroup>
+  <Accordion title="Content not visible when keyboard opens">
+    **Problem:** When keyboard opens, content gets squeezed and becomes not visible.
+
+    **Solution:** Handle keyboard visibility in your app wrapper.
+
+    **iOS:**
+```swift
+    // Adjust WebView constraints when keyboard shows
+    NotificationCenter.default.addObserver(
+        self,
+        selector: #selector(keyboardWillShow),
+        name: UIResponder.keyboardWillShowNotification,
+        object: nil
+    )
+```
+
+    **Android:**
+```xml
+    <!-- In AndroidManifest.xml -->
+    <activity
+        android:name=".WebViewActivity"
+        android:windowSoftInputMode="adjustResize">
+    </activity>
+```
+
+    See [Best Practices - Mobile Integration](/webview/best-practices#mobile-app-integration) for complete code.
+  </Accordion>
+
+  <Accordion title="User can zoom and breaks layout">
+    **Problem:** Users can pinch-to-zoom and it breaks the layout.
+
+    **Solution:** Disable zoom in your WebView.
+
+    **Web:**
+```html
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+```
+
+    **iOS:**
+```swift
+    webView.scrollView.isScrollEnabled = false
+    webView.scrollView.bounces = false
+```
+
+    **Android:**
+```kotlin
+    webView.settings.apply {
+        setSupportZoom(false)
+        builtInZoomControls = false
+    }
+```
+
+    See [Best Practices - Disable Zoom](/webview/best-practices#disable-zoom) for details.
+  </Accordion>
+
+  <Accordion title="Links don't open from iframe">
+    **Problem:** External links clicked in Doshi Frontend don't open.
+
+    **Cause:** Popups are blocked for security reasons.
+
+    **Solution:** Implement postMessage callback to handle link clicks.
+```typescript
+    window.addEventListener('message', (event) => {
+      if (event.origin !== 'https://embed.doshi.app') return;
+      
+      const data = JSON.parse(event.data);
+      
+      if (data.type === 'EXTERNAL_LINK') {
+        // Handle the link in your environment
+        window.open(data.url, '_blank', 'noopener,noreferrer');
+      }
+    });
+```
+
+    See [Best Practices - Handling Link Clicks](/webview/best-practices#handling-link-clicks) for platform-specific implementations.
+  </Accordion>
+
+  <Accordion title="WebView not loading on mobile">
+    **Problem:** Doshi Frontend doesn't load in mobile WebView.
+
+    **Solutions:**
+
+    1. **Enable JavaScript:**
+```kotlin
+    // Android
+    webView.settings.javaScriptEnabled = true
+    webView.settings.domStorageEnabled = true
+```
+```swift
+    // iOS
+    let preferences = WKPreferences()
+    preferences.javaScriptEnabled = true
+    webConfiguration.preferences = preferences
+```
+
+    2. **Check HTTPS:**
+    - Ensure you're loading `https://embed.doshi.app`
+    - iOS requires HTTPS by default (App Transport Security)
+
+    3. **Check App Permissions:**
+```xml
+    <!-- Android: In AndroidManifest.xml -->
+    <uses-permission android:name="android.permission.INTERNET" />
+```
+```xml
+    <!-- iOS: In Info.plist (if using HTTP for testing) -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
+```
+  </Accordion>
+</AccordionGroup>
+
+
 ### Network Issues
 
 <AccordionGroup>

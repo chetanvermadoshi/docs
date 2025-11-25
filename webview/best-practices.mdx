@@ -10,6 +10,7 @@ description: "Optimization tips and best practices for webview authentication"
 <Warning>
   **Critical**: Never expose your API key in client-side code. Always call the Doshi API from your backend.
 </Warning>
+
 ```typescript
 // ✅ Correct - Backend handles API key
 // backend/api/auth.ts
@@ -34,11 +35,13 @@ const response = await fetch('https://api.doshi.app/client/auth/token', {
 ### Environment Variables
 
 Store your API key securely:
+
 ```bash
 # .env
 DOSHI_API_KEY=your_api_key_here
 DOSHI_API_URL=https://api.doshi.app
 ```
+
 ```typescript
 // config.ts
 export const config = {
@@ -53,6 +56,7 @@ export const config = {
 ```
 
 ### Always Use HTTPS
+
 ```javascript
 // ✅ Correct
 const webviewUrl = "https://embed.v2.doshi.app";
@@ -63,6 +67,7 @@ const insecureUrl = "http://embed.v2.doshi.app";
 ```
 
 ### Implement Proper Origin Checks
+
 ```javascript
 // For postMessage
 window.addEventListener("message", (event) => {
@@ -77,6 +82,7 @@ window.addEventListener("message", (event) => {
 ```
 
 ### Never Use Wildcards in Production
+
 ```javascript
 // ❌ Development/testing only
 webview.contentWindow.postMessage(data, "*");
@@ -86,6 +92,7 @@ webview.contentWindow.postMessage(data, "https://embed.v2.doshi.app");
 ```
 
 ### Validate All Data
+
 ```typescript
 function validateAuthData(data: any): data is AuthData {
   if (!data || typeof data !== 'object') {
@@ -120,6 +127,7 @@ try {
 <Tip>
   Cache the nonce token temporarily if you need to render multiple iframes for the same user session
 </Tip>
+
 ```typescript
 // Token cache with expiration
 class TokenCache {
@@ -159,6 +167,7 @@ const tokenCache = new TokenCache();
 ```
 
 ### Optimize Message Size
+
 ```javascript
 // ✅ Send all data in a single message
 const authData = {
@@ -177,6 +186,7 @@ webview.contentWindow.postMessage(JSON.stringify({ segment }), origin);
 ```
 
 ### Implement Proper Cleanup
+
 ```typescript
 useEffect(() => {
   const handleMessage = (event: MessageEvent) => {
@@ -193,6 +203,7 @@ useEffect(() => {
 ```
 
 ### Lazy Load the Iframe
+
 ```tsx
 import React, { useState, useEffect } from 'react';
 
@@ -217,15 +228,558 @@ const LazyWebview: React.FC = () => {
 ```
 
 ### Preconnect to Doshi Domain
+
 ```html
 <!-- Add to <head> for faster iframe loading -->
 <link rel="preconnect" href="https://embed.doshi.app">
 <link rel="dns-prefetch" href="https://embed.doshi.app">
 ```
 
+## Mobile App Integration
+
+When embedding Doshi Frontend in a mobile app (iOS/Android WebView), there are special considerations:
+
+### Disable Zoom
+
+<Warning>
+  Zooming should be disabled on mobile to prevent layout issues and ensure consistent user experience.
+</Warning>
+
+**For Web (HTML Meta Tag):**
+
+```html
+<!-- Add to your <head> tag -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+```
+
+**For React:**
+
+```tsx
+// Add to your main HTML file or use react-helmet
+import { Helmet } from 'react-helmet';
+
+function App() {
+  return (
+    <>
+      <Helmet>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      </Helmet>
+      <DoshiEmbed />
+    </>
+  );
+}
+```
+
+**For iOS (Swift/UIWebView):**
+
+```swift
+// Disable pinch to zoom
+webView.scrollView.isScrollEnabled = false
+webView.scrollView.bounces = false
+
+// For WKWebView
+let webConfiguration = WKWebViewConfiguration()
+webView = WKWebView(frame: .zero, configuration: webConfiguration)
+webView.scrollView.isScrollEnabled = false
+
+// Inject viewport meta tag
+let viewportScript = """
+var meta = document.createElement('meta');
+meta.setAttribute('name', 'viewport');
+meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+document.getElementsByTagName('head')[0].appendChild(meta);
+"""
+let userScript = WKUserScript(source: viewportScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+webView.configuration.userContentController.addUserScript(userScript)
+```
+
+**For Android (WebView):**
+
+```kotlin
+// In your Activity or Fragment
+webView.settings.apply {
+    setSupportZoom(false)
+    builtInZoomControls = false
+    displayZoomControls = false
+}
+
+// Load HTML with viewport meta tag
+val htmlContent = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+</head>
+<body>
+    <iframe src="https://embed.doshi.app?token=YOUR_TOKEN" 
+            style="width:100%; height:100vh; border:none;">
+    </iframe>
+</body>
+</html>
+"""
+webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+```
+
+### Handle Keyboard in Mobile Apps
+
+<Warning>
+  When the keyboard opens in mobile apps, it can squeeze the iframe height and make content not visible. Handle this in your app environment.
+</Warning>
+
+The Doshi Frontend is designed to work within mobile WebViews, but your app needs to handle keyboard behavior correctly.
+
+**iOS (Swift) - Adjust WebView when Keyboard Opens:**
+
+```swift
+class ViewController: UIViewController {
+    var webView: WKWebView!
+    var webViewBottomConstraint: NSLayoutConstraint!
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        // Setup WebView with constraints
+        webView = WKWebView()
+        view.addSubview(webView)
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+        
+        webViewBottomConstraint = webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        webViewBottomConstraint.isActive = true
+        
+        // Observe keyboard notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+    }
+    
+    @objc func keyboardWillShow(_ notification: Notification) {
+        guard let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else {
+            return
+        }
+        
+        // Adjust WebView bottom constraint
+        webViewBottomConstraint.constant = -keyboardFrame.height
+        
+        UIView.animate(withDuration: 0.3) {
+            self.view.layoutIfNeeded()
+        }
+    }
+    
+    @objc func keyboardWillHide(_ notification: Notification) {
+        // Reset WebView bottom constraint
+        webViewBottomConstraint.constant = 0
+        
+        UIView.animate(withDuration: 0.3) {
+            self.view.layoutIfNeeded()
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+}
+```
+
+**Android (Kotlin) - Adjust WebView when Keyboard Opens:**
+
+```kotlin
+class WebViewActivity : AppCompatActivity() {
+    private lateinit var webView: WebView
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Set window to adjust resize when keyboard appears
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        
+        setContentView(R.layout.activity_webview)
+        
+        webView = findViewById(R.id.webView)
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+        }
+        
+        // Optional: Listen to keyboard visibility
+        val rootView = findViewById<View>(android.R.id.content)
+        rootView.viewTreeObserver.addOnGlobalLayoutListener {
+            val heightDiff = rootView.rootView.height - rootView.height
+            if (heightDiff > 200) {
+                // Keyboard is visible
+                onKeyboardVisible(heightDiff)
+            } else {
+                // Keyboard is hidden
+                onKeyboardHidden()
+            }
+        }
+    }
+    
+    private fun onKeyboardVisible(keyboardHeight: Int) {
+        // Adjust WebView or scroll to focused input
+        webView.evaluateJavascript("""
+            (function() {
+                var activeElement = document.activeElement;
+                if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+                    activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            })();
+        """, null)
+    }
+    
+    private fun onKeyboardHidden() {
+        // Reset any adjustments if needed
+    }
+}
+```
+
+**React Native (if applicable):**
+
+```javascript
+import { KeyboardAvoidingView, Platform } from 'react-native';
+import { WebView } from 'react-native-webview';
+
+function DoshiWebView() {
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <WebView
+        source={{ uri: 'https://embed.doshi.app?token=YOUR_TOKEN' }}
+        style={{ flex: 1 }}
+        scrollEnabled={false}
+        scalesPageToFit={false}
+      />
+    </KeyboardAvoidingView>
+  );
+}
+```
+
+**In Manifest (Android):**
+
+```xml
+<!-- In AndroidManifest.xml -->
+<activity
+    android:name=".WebViewActivity"
+    android:windowSoftInputMode="adjustResize">
+</activity>
+```
+
+### Best Practices for Mobile
+
+<Check>
+  Always disable zoom for consistent experience
+</Check>
+
+ <Check>
+  Handle keyboard visibility in your app wrapper
+</Check>
+
+ <Check>
+  Use `adjustResize` on Android to resize layout when keyboard appears
+</Check>
+
+ <Check>
+  Use constraint-based layout on iOS to adjust for keyboard
+</Check>
+
+ <Check>
+  Test on various screen sizes and keyboard types
+</Check>
+
+ <Check>
+  Ensure input fields remain visible when keyboard is open
+</Check>
+
+
+## Handling Link Clicks
+
+<Warning>
+  Doshi Frontend cannot handle external link clicks that open in new windows/popups due to security restrictions.
+</Warning>
+
+### Why Popups Are Blocked
+
+For security reasons, Doshi Frontend does not support opening links in popups or new windows from within the iframe. This prevents:
+
+- Phishing attacks
+- Unauthorized redirects
+- Cross-site scripting vulnerabilities
+
+### postMessage Callback for Link Clicks
+
+When users click on external links within Doshi Frontend, the iframe will send a postMessage to your parent application. You must handle these messages and open links in your environment.
+
+**Listen for Link Click Messages:**
+
+```typescript
+window.addEventListener('message', (event) => {
+  // Verify origin
+  if (event.origin !== 'https://embed.doshi.app') return;
+  
+  try {
+    const data = typeof event.data === 'string' 
+      ? JSON.parse(event.data) 
+      : event.data;
+    
+    // Handle external link clicks
+    if (data.type === 'EXTERNAL_LINK') {
+      const { url, title } = data;
+      
+      // Open in same tab
+      window.location.href = url;
+      
+      // Or open in new tab
+      // window.open(url, '_blank');
+      
+      // Or handle in your app's navigation
+      // navigateToExternal(url);
+    }
+  } catch (error) {
+    console.error('Error handling message:', error);
+  }
+});
+```
+
+**iOS (Swift) - Handle Link Callbacks:**
+
+```swift
+// Add WKScriptMessageHandler
+extension ViewController: WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, 
+                              didReceive message: WKScriptMessage) {
+        if message.name == "linkHandler" {
+            if let body = message.body as? [String: Any],
+               let url = body["url"] as? String {
+                // Handle the link
+                if let linkUrl = URL(string: url) {
+                    // Option 1: Open in Safari
+                    UIApplication.shared.open(linkUrl)
+                    
+                    // Option 2: Open in SFSafariViewController
+                    let safariVC = SFSafariViewController(url: linkUrl)
+                    present(safariVC, animated: true)
+                }
+            }
+        }
+    }
+}
+
+// Setup message handler
+override func viewDidLoad() {
+    super.viewDidLoad()
+    
+    let contentController = webView.configuration.userContentController
+    contentController.add(self, name: "linkHandler")
+    
+    // Inject message handler script
+    let script = """
+    window.addEventListener('message', function(event) {
+        if (event.data.type === 'EXTERNAL_LINK') {
+            window.webkit.messageHandlers.linkHandler.postMessage({
+                url: event.data.url,
+                title: event.data.title
+            });
+        }
+    });
+    """
+    
+    let userScript = WKUserScript(
+        source: script,
+        injectionTime: .atDocumentEnd,
+        forMainFrameOnly: false
+    )
+    contentController.addUserScript(userScript)
+}
+```
+
+**Android (Kotlin) - Handle Link Callbacks:**
+
+```kotlin
+webView.webViewClient = object : WebViewClient() {
+    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+        val url = request?.url.toString()
+        
+        // If it's an external link, handle it in your app
+        if (url.startsWith("http") && !url.contains("embed.doshi.app")) {
+            // Option 1: Open in external browser
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            startActivity(intent)
+            return true
+            
+            // Option 2: Open in Chrome Custom Tabs
+            val builder = CustomTabsIntent.Builder()
+            val customTabsIntent = builder.build()
+            customTabsIntent.launchUrl(this@WebViewActivity, Uri.parse(url))
+            return true
+        }
+        
+        return false
+    }
+}
+
+// Add JavaScript interface for postMessage
+webView.addJavascriptInterface(object {
+    @JavascriptInterface
+    fun handleExternalLink(url: String, title: String) {
+        runOnUiThread {
+            // Handle the link
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            startActivity(intent)
+        }
+    }
+}, "AndroidInterface")
+
+// Inject message listener
+webView.evaluateJavascript("""
+    window.addEventListener('message', function(event) {
+        if (event.data.type === 'EXTERNAL_LINK') {
+            AndroidInterface.handleExternalLink(event.data.url, event.data.title);
+        }
+    });
+""", null)
+```
+
+**React - Handle Link Callbacks:**
+
+```tsx
+import React, { useEffect } from 'react';
+
+function DoshiEmbed() {
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://embed.doshi.app') return;
+      
+      try {
+        const data = typeof event.data === 'string'
+          ? JSON.parse(event.data)
+          : event.data;
+        
+        if (data.type === 'EXTERNAL_LINK') {
+          // Option 1: Navigate in same window
+          window.location.href = data.url;
+          
+          // Option 2: Open in new tab
+          // window.open(data.url, '_blank', 'noopener,noreferrer');
+          
+          // Option 3: Use React Router (if applicable)
+          // navigate(`/external?url=${encodeURIComponent(data.url)}`);
+          
+          // Option 4: Show confirmation dialog
+          // if (confirm(`Open ${data.title || 'link'}?`)) {
+          //   window.open(data.url, '_blank');
+          // }
+        }
+      } catch (error) {
+        console.error('Error handling link message:', error);
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+  
+  return (
+    <iframe
+      src="https://embed.doshi.app"
+      className="w-full h-screen"
+      frameBorder="0"
+      allowFullScreen
+    />
+  );
+}
+```
+
+### Message Format
+
+When a user clicks an external link, Doshi Frontend sends:
+
+```typescript
+{
+  type: 'EXTERNAL_LINK',
+  url: 'https://example.com/article',
+  title: 'Article Title', // Optional
+  timestamp: 1234567890
+}
+```
+
+### Security Considerations
+
+<Check>
+  Always verify `event.origin` before processing messages
+</Check>
+
+ <Check>
+  Validate URLs before opening (check for malicious protocols)
+</Check>
+
+ <Check>
+  Use `noopener,noreferrer` when opening links in new tabs
+</Check>
+
+ <Check>
+  Consider showing user confirmation for external links
+</Check>
+
+ <Check>
+  Log external link clicks for security auditing
+</Check>
+
+
+### URL Validation Example
+
+```typescript
+function isValidUrl(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    
+    // Only allow http and https protocols
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      return false;
+    }
+    
+    // Optional: Whitelist or blacklist domains
+    const blockedDomains = ['malicious-site.com', 'phishing-site.com'];
+    if (blockedDomains.some(domain => urlObj.hostname.includes(domain))) {
+      return false;
+    }
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Use in message handler
+if (data.type === 'EXTERNAL_LINK') {
+  if (isValidUrl(data.url)) {
+    window.open(data.url, '_blank', 'noopener,noreferrer');
+  } else {
+    console.warn('Invalid or blocked URL:', data.url);
+  }
+}
+```
+
 ## Error Handling Best Practices
 
 ### Comprehensive Error Handling
+
 ```typescript
 const handleAuthentication = async () => {
   try {
@@ -266,6 +820,7 @@ const handleAuthentication = async () => {
 ```
 
 ### User Feedback
+
 ```tsx
 const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -296,6 +851,7 @@ return (
 ```
 
 ### Timeout Handling
+
 ```typescript
 const AUTH_TIMEOUT = 10000; // 10 seconds
 
@@ -321,12 +877,31 @@ try {
 
 ### When to Use postMessage
 
-<Check>Handling sensitive authentication data</Check>
-<Check>Need for real-time, bidirectional communication</Check>
-<Check>Production environments</Check>
-<Check>Multiple authentication steps</Check>
-<Check>Maximum security requirements</Check>
-<Check>Complex 2FA flows</Check>
+<Check>
+  Handling sensitive authentication data
+</Check>
+
+ <Check>
+  Need for real-time, bidirectional communication
+</Check>
+
+ <Check>
+  Production environments
+</Check>
+
+ <Check>
+  Multiple authentication steps
+</Check>
+
+ <Check>
+  Maximum security requirements
+</Check>
+
+ <Check>
+  Complex 2FA flows
+</Check>
+
+
 ```typescript
 // Use postMessage for production
 const ProductionWebview = ({ userData }) => {
@@ -337,11 +912,27 @@ const ProductionWebview = ({ userData }) => {
 
 ### When to Use Query Parameters
 
-<Check>Simple, one-time authentication</Check>
-<Check>Rapid prototyping and development</Check>
-<Check>Need for easier debugging</Check>
-<Check>Simpler implementation requirements</Check>
-<Check>Quick demos or proof of concepts</Check>
+<Check>
+  Simple, one-time authentication
+</Check>
+
+ <Check>
+  Rapid prototyping and development
+</Check>
+
+ <Check>
+  Need for easier debugging
+</Check>
+
+ <Check>
+  Simpler implementation requirements
+</Check>
+
+ <Check>
+  Quick demos or proof of concepts
+</Check>
+
+
 ```typescript
 // Use query params for development/testing
 const DevelopmentWebview = ({ userData }) => {
@@ -353,6 +944,7 @@ const DevelopmentWebview = ({ userData }) => {
 ## Code Organization
 
 ### Separation of Concerns
+
 ```typescript
 // services/doshi-auth.service.ts
 export class DoshiAuthService {
@@ -387,6 +979,7 @@ export const DoshiEmbed: React.FC<Props> = ({ userData }) => {
 ```
 
 ### Configuration Management
+
 ```typescript
 // config/doshi.config.ts
 export const doshiConfig = {
@@ -413,6 +1006,7 @@ export const getConfig = () => {
 ## Styling Best Practices
 
 ### Responsive Container
+
 ```css
 .webview-container {
   /* Full viewport height */
@@ -444,6 +1038,7 @@ export const getConfig = () => {
 ```
 
 ### Loading States
+
 ```tsx
 const LoadingOverlay: React.FC = () => (
   <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
@@ -462,6 +1057,7 @@ const LoadingOverlay: React.FC = () => (
 ```
 
 ### Full-Screen Support
+
 ```css
 .webview-container iframe {
   width: 100%;
@@ -480,6 +1076,7 @@ const LoadingOverlay: React.FC = () => (
 ## Testing Best Practices
 
 ### Environment-Specific Testing
+
 ```typescript
 describe('Doshi Authentication', () => {
   beforeEach(() => {
@@ -506,6 +1103,7 @@ describe('Doshi Authentication', () => {
 ```
 
 ### Mock API Responses
+
 ```typescript
 // __mocks__/doshi-api.ts
 export const mockDoshiApi = {
@@ -522,6 +1120,7 @@ export const mockDoshiApi = {
 ```
 
 ### Integration Testing
+
 ```typescript
 import { render, screen, waitFor } from '@testing-library/react';
 
@@ -541,6 +1140,7 @@ test('displays webview after successful authentication', async () => {
 ## Monitoring and Logging
 
 ### Track Key Events
+
 ```typescript
 // Track authentication flow
 const trackAuthEvent = (event: string, metadata?: any) => {
@@ -560,6 +1160,7 @@ trackAuthEvent('Iframe Loaded', { userId: user.id });
 ```
 
 ### Error Monitoring
+
 ```typescript
 // Send errors to monitoring service
 const logError = (error: Error, context?: any) => {
@@ -585,6 +1186,7 @@ try {
 ```
 
 ### Performance Monitoring
+
 ```typescript
 // Measure authentication performance
 const measureAuthPerformance = async () => {
@@ -621,21 +1223,66 @@ const measureAuthPerformance = async () => {
 
 ## Production Checklist
 
-<Check>API key stored securely in environment variables</Check>
-<Check>API calls made from backend only</Check>
-<Check>HTTPS used for all URLs</Check>
-<Check>Origin verification enabled for postMessage</Check>
-<Check>No "*" wildcards in production</Check>
-<Check>Comprehensive error handling implemented</Check>
-<Check>User feedback for all states (loading, error, success)</Check>
-<Check>Timeout handling for slow connections</Check>
-<Check>Proper cleanup of event listeners</Check>
-<Check>Error logging and monitoring configured</Check>
-<Check>Performance tracking in place</Check>
-<Check>Tested across multiple browsers</Check>
-<Check>Tested on mobile devices</Check>
-<Check>Responsive design implemented</Check>
-<Check>Accessibility considerations addressed</Check>
+<Check>
+  API key stored securely in environment variables
+</Check>
+
+ <Check>
+  API calls made from backend only
+</Check>
+
+ <Check>
+  HTTPS used for all URLs
+</Check>
+
+ <Check>
+  Origin verification enabled for postMessage
+</Check>
+
+ <Check>
+  No "\*" wildcards in production
+</Check>
+
+ <Check>
+  Comprehensive error handling implemented
+</Check>
+
+ <Check>
+  User feedback for all states (loading, error, success)
+</Check>
+
+ <Check>
+  Timeout handling for slow connections
+</Check>
+
+ <Check>
+  Proper cleanup of event listeners
+</Check>
+
+ <Check>
+  Error logging and monitoring configured
+</Check>
+
+ <Check>
+  Performance tracking in place
+</Check>
+
+ <Check>
+  Tested across multiple browsers
+</Check>
+
+ <Check>
+  Tested on mobile devices
+</Check>
+
+ <Check>
+  Responsive design implemented
+</Check>
+
+ <Check>
+  Accessibility considerations addressed
+</Check>
+
 
 ## Next Steps
 
