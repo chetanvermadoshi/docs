@@ -23,12 +23,12 @@ After obtaining your nonce token from the API, you can pass it to the iframe usi
 <CardGroup cols={2}>
   <Card title="postMessage API" icon="message" href="/webview/postmessage">
     **Recommended for production**
-    
+
     Real-time, secure cross-origin communication. Best for sensitive data and dynamic flows.
   </Card>
   <Card title="Query Parameters" icon="link" href="/webview/query-parameters">
     **Simple implementation**
-    
+
     URL-based authentication. Best for quick setup and debugging.
   </Card>
 </CardGroup>
@@ -53,6 +53,7 @@ After obtaining your nonce token from the API, you can pass it to the iframe usi
 ## Data Structure
 
 ### Required Parameter
+
 ```typescript
 interface AuthData {
   token: string; // Nonce token from API (required)
@@ -60,6 +61,7 @@ interface AuthData {
 ```
 
 ### Optional Parameters
+
 ```typescript
 interface AuthData {
   token: string;              // Required
@@ -84,6 +86,7 @@ interface AuthData {
 Contact [hello@doshi.app](mailto:hello@doshi.app) to receive your static API key.
 
 ### 2. Generate Nonce Token
+
 ```bash
 curl -X POST https://api.doshi.app/client/auth/token \
   -H "Authorization: Bearer YOUR_API_KEY" \
@@ -96,6 +99,7 @@ curl -X POST https://api.doshi.app/client/auth/token \
 See the [full API reference](/api-reference/auth/get-custom-authentication-token).
 
 ### 3. Embed the Webview
+
 ```html
 <iframe
   src="https://embed.doshi.app"
@@ -110,6 +114,7 @@ See the [full API reference](/api-reference/auth/get-custom-authentication-token
 Choose your preferred method:
 
 <CodeGroup>
+
 ```tsx postMessage
 // Listen for PING from iframe
 window.addEventListener("message", (event) => {
@@ -125,6 +130,8 @@ window.addEventListener("message", (event) => {
   }
 });
 ```
+
+
 ```tsx Query Parameters
 const params = new URLSearchParams({
   token: "your_nonce_token",
@@ -140,6 +147,7 @@ const iframeUrl = `https://embed.doshi.app?${params.toString()}`;
 ## 2FA Support
 
 When 2FA is enabled for your organization, pass the required user information:
+
 ```typescript
 const authData = {
   token: "your_nonce_token",
@@ -154,6 +162,7 @@ const authData = {
 ```
 
 The Doshi iframe will automatically:
+
 1. Display the OTP input screen
 2. Send the OTP to the user's phone
 3. Verify the OTP
@@ -168,7 +177,7 @@ The Doshi iframe will automatically:
 Once authenticated, sessions are managed automatically:
 
 - **ID Token**: Valid for 1 hour
-- **Refresh Token**: Valid for 12 hours  
+- **Refresh Token**: Valid for 12 hours
 - **Auto-refresh**: Tokens are refreshed automatically by the iframe
 
 No action required from your application!
@@ -180,6 +189,7 @@ No action required from your application!
 The `segment` parameter is used for handling multiple learning paths under the same organization. This allows you to direct users to different educational journeys based on their needs or preferences.
 
 **Example:**
+
 ```typescript
 {
   segment: "premium",  // or "basic", "enterprise", etc.
@@ -191,6 +201,7 @@ The `segment` parameter is used for handling multiple learning paths under the s
 Used to identify which branch or location the user belongs to within your organization.
 
 **Example:**
+
 ```typescript
 {
   branchId: "branch_789",  // Your branch identifier

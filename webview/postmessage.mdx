@@ -28,6 +28,7 @@ The postMessage API provides secure, real-time cross-origin communication betwee
 </Steps>
 
 ## TypeScript Interfaces
+
 ```typescript
 interface AuthData {
   token: string;              // Required - nonce token from API
@@ -53,6 +54,7 @@ interface WebviewMessage {
 ## React Implementation
 
 ### Complete Example with API Call
+
 ```tsx
 import React, { useEffect, useState } from "react";
 
@@ -244,6 +246,7 @@ export default WebviewComponent;
 ```
 
 ### Usage Example
+
 ```tsx
 import WebviewComponent from './WebviewComponent';
 
@@ -284,6 +287,7 @@ function AppWith2FA() {
 ## Vanilla JavaScript Implementation
 
 ### Parent Window
+
 ```javascript
 // Configuration
 const config = {
@@ -447,6 +451,7 @@ fetchAuthToken();
 ```
 
 ### HTML Structure
+
 ```html
 <!DOCTYPE html>
 <html lang="en">
@@ -491,6 +496,7 @@ fetchAuthToken();
 ## Backend Implementation
 
 Your backend should handle the API key securely:
+
 ```typescript
 // backend/routes/auth.ts
 import express from 'express';
@@ -508,7 +514,7 @@ router.post('/generate-doshi-token', async (req, res) => {
 
     // Call Doshi API with your API key
     const response = await fetch(
-      'https://production-doshi-api-8kq2.encr.app/client/auth/token',
+      'https://api.doshi.app/client/auth/token',
       {
         method: 'POST',
         headers: {
@@ -549,6 +555,7 @@ export default router;
 </Note>
 
 ### Sending PING
+
 ```javascript
 // Inside the webview, send PING to parent when ready
 window.parent.postMessage(
@@ -558,6 +565,7 @@ window.parent.postMessage(
 ```
 
 ### Receiving AUTH Data
+
 ```javascript
 // Listen for AUTH response from parent
 window.addEventListener("message", (event) => {
@@ -625,6 +633,7 @@ window.addEventListener("message", (event) => {
 ## Advanced: Retry Logic
 
 Add retry logic for more robust authentication:
+
 ```typescript
 const WebviewWithRetry: React.FC<Props> = ({ userEmail }) => {
   const [retryCount, setRetryCount] = useState(0);
@@ -674,16 +683,19 @@ const WebviewWithRetry: React.FC<Props> = ({ userEmail }) => {
 
   <Expandable title="Available Types">
     **From Iframe to Parent:**
+
     - `PING`: Sent by webview to signal readiness
     - `AUTH_SUCCESS`: Authentication completed successfully
     - `AUTH_ERROR`: Authentication failed
-    
+
     **From Parent to Iframe:**
+
     - `AUTH`: Sent by parent with authentication data
   </Expandable>
 </ParamField>
 
 ## Testing postMessage Flow
+
 ```javascript
 // Test the authentication flow
 function testPostMessageFlow() {
@@ -714,22 +726,23 @@ function testPostMessageFlow() {
 <AccordionGroup>
   <Accordion title="Messages not being received">
     **Solutions:**
+
     1. Check that origin validation matches exactly
     2. Verify iframe has loaded before sending messages
     3. Ensure JSON.stringify is used when sending data
     4. Check browser console for errors
   </Accordion>
-
   <Accordion title="Token not available">
     **Solutions:**
+
     1. Ensure backend API call completed successfully
     2. Check network tab for API response
     3. Verify error handling in token fetch logic
     4. Check that API key is valid
   </Accordion>
-
   <Accordion title="2FA not triggering">
     **Solutions:**
+
     1. Verify `is2FaEnabled` is set to `true`
     2. Ensure all required 2FA fields are provided
     3. Check that organization has 2FA enabled

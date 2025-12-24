@@ -487,26 +487,25 @@ function DoshiWebView() {
   Always disable zoom for consistent experience
 </Check>
 
- <Check>
+<Check>
   Handle keyboard visibility in your app wrapper
 </Check>
 
- <Check>
+<Check>
   Use `adjustResize` on Android to resize layout when keyboard appears
 </Check>
 
- <Check>
+<Check>
   Use constraint-based layout on iOS to adjust for keyboard
 </Check>
 
- <Check>
+<Check>
   Test on various screen sizes and keyboard types
 </Check>
 
- <Check>
+<Check>
   Ensure input fields remain visible when keyboard is open
 </Check>
-
 
 ## Handling Link Clicks
 
@@ -725,22 +724,21 @@ When a user clicks an external link, Doshi Frontend sends:
   Always verify `event.origin` before processing messages
 </Check>
 
- <Check>
+<Check>
   Validate URLs before opening (check for malicious protocols)
 </Check>
 
- <Check>
+<Check>
   Use `noopener,noreferrer` when opening links in new tabs
 </Check>
 
- <Check>
+<Check>
   Consider showing user confirmation for external links
 </Check>
 
- <Check>
+<Check>
   Log external link clicks for security auditing
 </Check>
-
 
 ### URL Validation Example
 
@@ -881,26 +879,25 @@ try {
   Handling sensitive authentication data
 </Check>
 
- <Check>
+<Check>
   Need for real-time, bidirectional communication
 </Check>
 
- <Check>
+<Check>
   Production environments
 </Check>
 
- <Check>
+<Check>
   Multiple authentication steps
 </Check>
 
- <Check>
+<Check>
   Maximum security requirements
 </Check>
 
- <Check>
+<Check>
   Complex 2FA flows
 </Check>
-
 
 ```typescript
 // Use postMessage for production
@@ -916,22 +913,21 @@ const ProductionWebview = ({ userData }) => {
   Simple, one-time authentication
 </Check>
 
- <Check>
+<Check>
   Rapid prototyping and development
 </Check>
 
- <Check>
+<Check>
   Need for easier debugging
 </Check>
 
- <Check>
+<Check>
   Simpler implementation requirements
 </Check>
 
- <Check>
+<Check>
   Quick demos or proof of concepts
 </Check>
-
 
 ```typescript
 // Use query params for development/testing
@@ -990,7 +986,7 @@ export const doshiConfig = {
     strictOriginCheck: false
   },
   production: {
-    apiUrl: 'https://production-doshi-api-8kq2.encr.app',
+    apiUrl: 'https://api.doshi.app',
     embedUrl: 'https://embed.doshi.app',
     enableDebugLogs: false,
     strictOriginCheck: true
@@ -1227,62 +1223,61 @@ const measureAuthPerformance = async () => {
   API key stored securely in environment variables
 </Check>
 
- <Check>
+<Check>
   API calls made from backend only
 </Check>
 
- <Check>
+<Check>
   HTTPS used for all URLs
 </Check>
 
- <Check>
+<Check>
   Origin verification enabled for postMessage
 </Check>
 
- <Check>
+<Check>
   No "\*" wildcards in production
 </Check>
 
- <Check>
+<Check>
   Comprehensive error handling implemented
 </Check>
 
- <Check>
+<Check>
   User feedback for all states (loading, error, success)
 </Check>
 
- <Check>
+<Check>
   Timeout handling for slow connections
 </Check>
 
- <Check>
+<Check>
   Proper cleanup of event listeners
 </Check>
 
- <Check>
+<Check>
   Error logging and monitoring configured
 </Check>
 
- <Check>
+<Check>
   Performance tracking in place
 </Check>
 
- <Check>
+<Check>
   Tested across multiple browsers
 </Check>
 
- <Check>
+<Check>
   Tested on mobile devices
 </Check>
 
- <Check>
+<Check>
   Responsive design implemented
 </Check>
 
- <Check>
+<Check>
   Accessibility considerations addressed
 </Check>
-
 
 ## Next Steps
 
