@@ -12,6 +12,7 @@ description: "Common issues and solutions for webview authentication"
     **Problem:** Backend returns an error when calling Doshi API.
 
     **Possible Causes:**
+
     - Invalid API key
     - API key not provided in Authorization header
     - Invalid request parameters
@@ -20,51 +21,55 @@ description: "Common issues and solutions for webview authentication"
     **Solutions:**
 
     1. **Verify API key:**
-```bash
-    # Test your API key
-    curl -X POST https://api.doshi.app/client/auth/token \
-      -H "Authorization: Bearer YOUR_API_KEY" \
-      -H "Content-Type: application/json" \
-      -d '{"email": "test@example.com"}'
-```
+
+    ```bash
+        # Test your API key
+        curl -X POST https://api.doshi.app/client/auth/token \
+          -H "Authorization: Bearer YOUR_API_KEY" \
+          -H "Content-Type: application/json" \
+          -d '{"email": "test@example.com"}'
+    ```
 
     2. **Check environment variables:**
-```typescript
-    // Verify API key is loaded
-    console.log('API Key exists:', !!process.env.DOSHI_API_KEY);
-    console.log('API Key length:', process.env.DOSHI_API_KEY?.length);
-    // Don't log the actual key!
-```
+
+    ```typescript
+        // Verify API key is loaded
+        console.log('API Key exists:', !!process.env.DOSHI_API_KEY);
+        console.log('API Key length:', process.env.DOSHI_API_KEY?.length);
+        // Don't log the actual key!
+    ```
 
     3. **Validate request parameters:**
-```typescript
-    // Ensure you're sending email OR partnerUserId
-    const requestBody = {
-      email: user.email || undefined,
-      partnerUserId: user.id || undefined
-    };
-    
-    if (!requestBody.email && !requestBody.partnerUserId) {
-      throw new Error('Must provide email or partnerUserId');
-    }
-```
+
+    ```typescript
+        // Ensure you're sending email OR partnerUserId
+        const requestBody = {
+          email: user.email || undefined,
+          partnerUserId: user.id || undefined
+        };
+        
+        if (!requestBody.email && !requestBody.partnerUserId) {
+          throw new Error('Must provide email or partnerUserId');
+        }
+    ```
 
     4. **Check API response:**
-```typescript
-    const response = await fetch(doshiApiUrl, options);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error:', response.status, errorText);
-      throw new Error(`API returned ${response.status}: ${errorText}`);
-    }
-```
-  </Accordion>
 
+    ```typescript
+        const response = await fetch(doshiApiUrl, options);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API Error:', response.status, errorText);
+          throw new Error(`API returned ${response.status}: ${errorText}`);
+        }
+    ```
+  </Accordion>
   <Accordion title="Token expired or invalid">
     **Problem:** Token is rejected by the iframe.
 
     **Possible Causes:**
+
     - Token was generated too long ago
     - Token was already used
     - Token format is incorrect
@@ -72,44 +77,46 @@ description: "Common issues and solutions for webview authentication"
     **Solutions:**
 
     1. **Generate token immediately before use:**
-```typescript
-    // ✅ Generate token right before passing to iframe
-    const token = await fetchToken();
-    passToIframe(token);
 
-    // ❌ Don't store tokens for long periods
-    const token = await fetchToken();
-    localStorage.setItem('token', token); // Don't do this
-```
+    ```typescript
+        // ✅ Generate token right before passing to iframe
+        const token = await fetchToken();
+        passToIframe(token);
+    
+        // ❌ Don't store tokens for long periods
+        const token = await fetchToken();
+        localStorage.setItem('token', token); // Don't do this
+    ```
 
     2. **Don't reuse tokens:**
-```typescript
-    // Each iframe load should get a fresh token
-    useEffect(() => {
-      const fetchAndSetToken = async () => {
-        const newToken = await fetchToken();
-        setToken(newToken);
-      };
-      
-      fetchAndSetToken();
-    }, []); // Fresh token on mount
-```
+
+    ```typescript
+        // Each iframe load should get a fresh token
+        useEffect(() => {
+          const fetchAndSetToken = async () => {
+            const newToken = await fetchToken();
+            setToken(newToken);
+          };
+          
+          fetchAndSetToken();
+        }, []); // Fresh token on mount
+    ```
 
     3. **Verify token format:**
-```typescript
-    const isValidToken = (token: string) => {
-      return token && 
-             typeof token === 'string' && 
-             token.length > 0 &&
-             !token.includes(' '); // No spaces
-    };
 
-    if (!isValidToken(token)) {
-      console.error('Invalid token format');
-    }
-```
+    ```typescript
+        const isValidToken = (token: string) => {
+          return token && 
+                 typeof token === 'string' && 
+                 token.length > 0 &&
+                 !token.includes(' '); // No spaces
+        };
+    
+        if (!isValidToken(token)) {
+          console.error('Invalid token format');
+        }
+    ```
   </Accordion>
-
   <Accordion title="API key exposed in frontend">
     **Problem:** API key is visible in client-side code.
 
@@ -118,44 +125,46 @@ description: "Common issues and solutions for webview authentication"
     **Solution:**
 
     1. **Move API calls to backend:**
-```typescript
-    // ❌ NEVER do this in frontend
-    const response = await fetch(doshiApiUrl, {
-      headers: {
-        'Authorization': `Bearer ${API_KEY}` // EXPOSED!
-      }
-    });
 
-    // ✅ Call your backend instead
-    const response = await fetch('/api/generate-doshi-token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ userId: user.id })
-    });
-```
+    ```typescript
+        // ❌ NEVER do this in frontend
+        const response = await fetch(doshiApiUrl, {
+          headers: {
+            'Authorization': `Bearer ${API_KEY}` // EXPOSED!
+          }
+        });
+    
+        // ✅ Call your backend instead
+        const response = await fetch('/api/generate-doshi-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ userId: user.id })
+        });
+    ```
 
     2. **Create backend endpoint:**
-```typescript
-    // backend/routes/auth.ts
-    app.post('/api/generate-doshi-token', async (req, res) => {
-      // Verify user is authenticated
-      if (!req.session?.userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
 
-      // Call Doshi API with server-side API key
-      const response = await fetch(doshiApiUrl, {
-        headers: {
-          'Authorization': `Bearer ${process.env.DOSHI_API_KEY}`
-        }
-      });
-
-      const data = await response.json();
-      res.json({ token: data.token });
-    });
-```
+    ```typescript
+        // backend/routes/auth.ts
+        app.post('/api/generate-doshi-token', async (req, res) => {
+          // Verify user is authenticated
+          if (!req.session?.userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+    
+          // Call Doshi API with server-side API key
+          const response = await fetch(doshiApiUrl, {
+            headers: {
+              'Authorization': `Bearer ${process.env.DOSHI_API_KEY}`
+            }
+          });
+    
+          const data = await response.json();
+          res.json({ token: data.token });
+        });
+    ```
   </Accordion>
 </AccordionGroup>
 
@@ -168,120 +177,127 @@ description: "Common issues and solutions for webview authentication"
     **Solutions:**
 
     1. **Verify origin:**
-```javascript
-    window.addEventListener("message", (event) => {
-      console.log('Message received from:', event.origin);
-      console.log('Expected origin:', 'https://embed.doshi.app');
-      
-      // Temporarily disable check for debugging
-      // if (event.origin !== 'https://embed.doshi.app') return;
-      
-      console.log('Message data:', event.data);
-    });
-```
+
+    ```javascript
+        window.addEventListener("message", (event) => {
+          console.log('Message received from:', event.origin);
+          console.log('Expected origin:', 'https://embed.v2.doshi.app');
+          
+          // Temporarily disable check for debugging
+          // if (event.origin !== 'https://embed.v2.doshi.app') return;
+          
+          console.log('Message data:', event.data);
+        });
+    ```
 
     2. **Check iframe is loaded:**
-```javascript
-    const iframe = document.querySelector('iframe');
-    
-    iframe.addEventListener('load', () => {
-      console.log('✅ Iframe loaded');
-      // Now it's safe to send messages
-    });
-```
+
+    ```javascript
+        const iframe = document.querySelector('iframe');
+        
+        iframe.addEventListener('load', () => {
+          console.log('✅ Iframe loaded');
+          // Now it's safe to send messages
+        });
+    ```
 
     3. **Verify message format:**
-```javascript
-    // Make sure you're sending proper JSON
-    const message = JSON.stringify({
-      token: authToken,
-      email: userEmail,
-      type: "AUTH"
-    });
-    
-    console.log('Sending message:', message);
-    iframe.contentWindow.postMessage(message, 'https://embed.doshi.app');
-```
+
+    ```javascript
+        // Make sure you're sending proper JSON
+        const message = JSON.stringify({
+          token: authToken,
+          email: userEmail,
+          type: "AUTH"
+        });
+        
+        console.log('Sending message:', message);
+        iframe.contentWindow.postMessage(message, 'https://embed.v2.doshi.app');
+    ```
 
     4. **Check for JavaScript errors:**
-```javascript
-    window.addEventListener('error', (event) => {
-      console.error('JavaScript error:', event.error);
-    });
-```
-  </Accordion>
 
+    ```javascript
+        window.addEventListener('error', (event) => {
+          console.error('JavaScript error:', event.error);
+        });
+    ```
+  </Accordion>
   <Accordion title="Origin mismatch errors">
     **Problem:** Messages are rejected due to origin mismatch.
 
     **Solutions:**
 
     1. **Log actual origins:**
-```javascript
-    window.addEventListener("message", (event) => {
-      console.log('Expected:', 'https://embed.doshi.app');
-      console.log('Received:', event.origin);
-      console.log('Match:', event.origin === 'https://embed.doshi.app');
-    });
-```
+
+    ```javascript
+        window.addEventListener("message", (event) => {
+          console.log('Expected:', 'https://embed.v2.doshi.app');
+          console.log('Received:', event.origin);
+          console.log('Match:', event.origin === 'https://embed.v2.doshi.app');
+        });
+    ```
 
     2. **Check for trailing slashes:**
-```javascript
-    // Normalize origin comparison
-    const normalizeOrigin = (origin) => origin.replace(/\/$/, '');
-    
-    if (normalizeOrigin(event.origin) !== normalizeOrigin(expectedOrigin)) {
-      return;
-    }
-```
+
+    ```javascript
+        // Normalize origin comparison
+        const normalizeOrigin = (origin) => origin.replace(/\/$/, '');
+        
+        if (normalizeOrigin(event.origin) !== normalizeOrigin(expectedOrigin)) {
+          return;
+        }
+    ```
 
     3. **Handle multiple environments:**
-```javascript
-    const allowedOrigins = [
-      'https://embed.doshi.app',
-      'https://staging-embed.doshi.app',
-      'http://localhost:3000' // Development only
-    ];
-    
-    if (!allowedOrigins.includes(event.origin)) {
-      console.warn('Rejected message from:', event.origin);
-      return;
-    }
-```
-  </Accordion>
 
+    ```javascript
+        const allowedOrigins = [
+          'https://embed.v2.doshi.app',
+          'http://localhost:3000' // Development only
+        ];
+        
+        if (!allowedOrigins.includes(event.origin)) {
+          console.warn('Rejected message from:', event.origin);
+          return;
+        }
+    ```
+  </Accordion>
   <Accordion title="PING not received">
     **Problem:** Parent window never receives PING from iframe.
 
     **Solutions:**
 
     1. **Check iframe URL:**
-```javascript
-    const iframe = document.querySelector('iframe');
-    console.log('Iframe src:', iframe?.src);
-    // Should be: https://embed.doshi.app
-```
+
+    ```javascript
+        const iframe = document.querySelector('iframe');
+        console.log('Iframe src:', iframe?.src);
+        // Should be: https://embed.v2.doshi.app
+    ```
 
     2. **Wait for iframe to load:**
-```javascript
-    const iframe = document.querySelector('iframe');
-    
-    iframe.addEventListener('load', () => {
-      console.log('Iframe loaded, waiting for PING...');
-    });
 
-    // Set a timeout to detect if PING never arrives
-    setTimeout(() => {
-      console.warn('No PING received after 5 seconds');
-    }, 5000);
-```
+    ```javascript
+        const iframe = document.querySelector('iframe');
+        
+        iframe.addEventListener('load', () => {
+          console.log('Iframe loaded, waiting for PING...');
+        });
+    
+        // Set a timeout to detect if PING never arrives
+        setTimeout(() => {
+          console.warn('No PING received after 5 seconds');
+        }, 5000);
+    ```
 
     3. **Check for errors in iframe:**
-```javascript
-    iframe.addEventListener('error', (e) => {
-      console.error('Iframe failed to load:', e);
-    });
-```
+
+    ```javascript
+        iframe.addEventListener('error', (e) => {
+          console.error('Iframe failed to load:', e);
+        });
+    ```
   </Accordion>
 </AccordionGroup>
 
@@ -294,91 +310,96 @@ description: "Common issues and solutions for webview authentication"
     **Solutions:**
 
     1. **Debug URL construction:**
-```javascript
-    const params = new URLSearchParams({
-      token: authToken,
-      email: userEmail
-    });
-    
-    const fullUrl = `https://embed.doshi.app?${params.toString()}`;
-    
-    console.log('Constructed URL:', fullUrl);
-    console.log('URL length:', fullUrl.length);
-    
-    // Verify iframe gets the URL
-    const iframe = document.querySelector('iframe');
-    console.log('Iframe src:', iframe?.src);
-```
+
+    ```javascript
+        const params = new URLSearchParams({
+          token: authToken,
+          email: userEmail
+        });
+        
+        const fullUrl = `https://embed.v2.doshi.app?${params.toString()}`;
+        
+        console.log('Constructed URL:', fullUrl);
+        console.log('URL length:', fullUrl.length);
+        
+        // Verify iframe gets the URL
+        const iframe = document.querySelector('iframe');
+        console.log('Iframe src:', iframe?.src);
+    ```
 
     2. **Check for undefined values:**
-```javascript
-    const params = new URLSearchParams();
-    
-    // Only add defined values
-    if (authToken) params.append('token', authToken);
-    if (userEmail) params.append('email', userEmail);
-    
-    console.log('Params:', Object.fromEntries(params));
-```
-  </Accordion>
 
+    ```javascript
+        const params = new URLSearchParams();
+        
+        // Only add defined values
+        if (authToken) params.append('token', authToken);
+        if (userEmail) params.append('email', userEmail);
+        
+        console.log('Params:', Object.fromEntries(params));
+    ```
+  </Accordion>
   <Accordion title="URL too long">
     **Problem:** URL exceeds browser limits (typically 2000 characters).
 
     **Solutions:**
 
     1. **Check URL length:**
-```javascript
-    const url = buildWebviewUrl(baseUrl, params);
-    
-    if (url.length > 2000) {
-      console.error('URL too long:', url.length, 'characters');
-      // Switch to postMessage method
-    }
-```
+
+    ```javascript
+        const url = buildWebviewUrl(baseUrl, params);
+        
+        if (url.length > 2000) {
+          console.error('URL too long:', url.length, 'characters');
+          // Switch to postMessage method
+        }
+    ```
 
     2. **Reduce parameter size:**
-```javascript
-    // Only include essential parameters
-    const minimalParams = {
-      token: authToken,
-      email: userEmail
-      // Fetch other data from API after auth
-    };
-```
+
+    ```javascript
+        // Only include essential parameters
+        const minimalParams = {
+          token: authToken,
+          email: userEmail
+          // Fetch other data from API after auth
+        };
+    ```
 
     3. **Switch to postMessage:**
-```typescript
-    // If URL is too long, use postMessage instead
-    if (estimatedUrlLength > 2000) {
-      return <WebviewWithPostMessage {...props} />;
-    }
-    return <WebviewWithQueryParams {...props} />;
-```
-  </Accordion>
 
+    ```typescript
+        // If URL is too long, use postMessage instead
+        if (estimatedUrlLength > 2000) {
+          return <WebviewWithPostMessage {...props} />;
+        }
+        return <WebviewWithQueryParams {...props} />;
+    ```
+  </Accordion>
   <Accordion title="Special characters breaking URL">
     **Problem:** Special characters not encoding properly.
 
     **Solutions:**
 
     1. **Use URLSearchParams:**
-```javascript
-    // ✅ Automatic encoding
-    const params = new URLSearchParams();
-    params.append('email', 'user+test@example.com');
-    params.append('name', 'John & Jane');
-    
-    // ❌ Manual concatenation
-    const url = `${baseUrl}?email=user+test@example.com`; // Wrong!
-```
+
+    ```javascript
+        // ✅ Automatic encoding
+        const params = new URLSearchParams();
+        params.append('email', 'user+test@example.com');
+        params.append('name', 'John & Jane');
+        
+        // ❌ Manual concatenation
+        const url = `${baseUrl}?email=user+test@example.com`; // Wrong!
+    ```
 
     2. **Verify encoding:**
-```javascript
-    const params = new URLSearchParams({ email: 'user+test@example.com' });
-    console.log('Encoded:', params.toString());
-    // Should be: email=user%2Btest%40example.com
-```
+
+    ```javascript
+        const params = new URLSearchParams({ email: 'user+test@example.com' });
+        console.log('Encoded:', params.toString());
+        // Should be: email=user%2Btest%40example.com
+    ```
   </Accordion>
 </AccordionGroup>
 
@@ -391,82 +412,88 @@ description: "Common issues and solutions for webview authentication"
     **Solutions:**
 
     1. **Verify 2FA flag:**
-```typescript
-    const authData = {
-      token: authToken,
-      is2FaEnabled: true, // Must be boolean true, not string
-      dob: '1990-01-15',
-      organizationId: 'org_123',
-      // ... other required fields
-    };
-    
-    console.log('2FA enabled:', authData.is2FaEnabled === true);
-```
+
+    ```typescript
+        const authData = {
+          token: authToken,
+          is2FaEnabled: true, // Must be boolean true, not string
+          dob: '1990-01-15',
+          organizationId: 'org_123',
+          // ... other required fields
+        };
+        
+        console.log('2FA enabled:', authData.is2FaEnabled === true);
+    ```
 
     2. **Check all required fields:**
-```typescript
-    const required2FAFields = [
-      'dob',
-      'organizationId',
-      'partnerUserId',
-      'firstName',
-      'lastName'
-    ];
-    
-    const missing = required2FAFields.filter(field => !authData[field]);
-    
-    if (missing.length > 0) {
-      console.error('Missing 2FA fields:', missing);
-    }
-```
+
+    ```typescript
+        const required2FAFields = [
+          'dob',
+          'organizationId',
+          'partnerUserId',
+          'firstName',
+          'lastName'
+        ];
+        
+        const missing = required2FAFields.filter(field => !authData[field]);
+        
+        if (missing.length > 0) {
+          console.error('Missing 2FA fields:', missing);
+        }
+    ```
 
     3. **Verify organization has 2FA enabled:**
-```javascript
-    // Check with your account manager if 2FA is enabled
-    // for your organization in Doshi
-```
-  </Accordion>
 
+    ```javascript
+        // Check with your account manager if 2FA is enabled
+        // for your organization in Doshi
+    ```
+  </Accordion>
   <Accordion title="OTP not received">
     **Problem:** User doesn't receive the OTP code.
 
     **Solutions:**
 
     1. **Verify phone number:**
-```typescript
-    // Ensure phone number is registered in Doshi
-    // Contact support@doshi.app if needed
-```
+
+    ```typescript
+        // Ensure phone number is registered in Doshi
+        // Contact support@doshi.app if needed
+    ```
 
     2. **Check OTP channel:**
-```typescript
-    // If SMS not working, user can try different channels
-    // The iframe will handle this automatically
-```
+
+    ```typescript
+        // If SMS not working, user can try different channels
+        // The iframe will handle this automatically
+    ```
 
     3. **Wait and retry:**
-```typescript
-    // OTP may take 30-60 seconds to arrive
-    // User can request resend from the iframe
-```
-  </Accordion>
 
+    ```typescript
+        // OTP may take 30-60 seconds to arrive
+        // User can request resend from the iframe
+    ```
+  </Accordion>
   <Accordion title="OTP verification failing">
     **Problem:** Correct OTP code is rejected.
 
     **Solutions:**
 
     1. **Check OTP expiration:**
-```typescript
-    // OTPs typically expire after 5-10 minutes
-    // User should request a new OTP
-```
+
+    ```typescript
+        // OTPs typically expire after 5-10 minutes
+        // User should request a new OTP
+    ```
 
     2. **Verify user details match:**
-```typescript
-    // All user details must match exactly
-    // (name, DOB, organization ID, partner user ID)
-```
+
+    ```typescript
+        // All user details must match exactly
+        // (name, DOB, organization ID, partner user ID)
+    ```
   </Accordion>
 </AccordionGroup>
 
@@ -477,56 +504,58 @@ description: "Common issues and solutions for webview authentication"
     **Problem:** postMessage API not supported.
 
     **Solution:**
-```javascript
-    // Check for support
-    if (typeof window.postMessage === 'undefined') {
-      console.error('postMessage not supported');
-      // Fallback to query parameters
-      return <WebviewWithQueryParams {...props} />;
-    }
-```
-  </Accordion>
 
+    ```javascript
+        // Check for support
+        if (typeof window.postMessage === 'undefined') {
+          console.error('postMessage not supported');
+          // Fallback to query parameters
+          return <WebviewWithQueryParams {...props} />;
+        }
+    ```
+  </Accordion>
   <Accordion title="URLSearchParams not available">
     **Problem:** URLSearchParams not supported in older browsers.
 
     **Solution:**
-```javascript
-    // Check for support and provide fallback
-    function buildQueryString(params) {
-      if (typeof URLSearchParams !== 'undefined') {
-        return new URLSearchParams(params).toString();
-      }
-      
-      // Fallback: manual encoding
-      return Object.entries(params)
-        .map(([key, value]) => 
-          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
-        )
-        .join('&');
-    }
-```
-  </Accordion>
 
+    ```javascript
+        // Check for support and provide fallback
+        function buildQueryString(params) {
+          if (typeof URLSearchParams !== 'undefined') {
+            return new URLSearchParams(params).toString();
+          }
+          
+          // Fallback: manual encoding
+          return Object.entries(params)
+            .map(([key, value]) => 
+              `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+            )
+            .join('&');
+        }
+    ```
+  </Accordion>
   <Accordion title="Iframe not loading on iOS Safari">
     **Problem:** Iframe doesn't load on iOS Safari.
 
     **Solutions:**
 
     1. **Check iframe attributes:**
-```html
-    <iframe
-      src="https://embed.doshi.app"
-      allow="fullscreen"
-      sandbox="allow-same-origin allow-scripts allow-forms"
-    />
-```
+
+    ```html
+        <iframe
+          src="https://embed.v2.doshi.app"
+          allow="fullscreen"
+          sandbox="allow-same-origin allow-scripts allow-forms"
+        />
+    ```
 
     2. **Ensure HTTPS:**
-```javascript
-    // iOS Safari requires HTTPS for iframes
-    const url = "https://embed.doshi.app"; // Must be HTTPS
-```
+
+    ```javascript
+        // iOS Safari requires HTTPS for iframes
+        const url = "https://embed.v2.doshi.app"; // Must be HTTPS
+    ```
   </Accordion>
 </AccordionGroup>
 
@@ -539,115 +568,122 @@ description: "Common issues and solutions for webview authentication"
     **Solution:** Handle keyboard visibility in your app wrapper.
 
     **iOS:**
-```swift
-    // Adjust WebView constraints when keyboard shows
-    NotificationCenter.default.addObserver(
-        self,
-        selector: #selector(keyboardWillShow),
-        name: UIResponder.keyboardWillShowNotification,
-        object: nil
-    )
-```
+
+    ```swift
+        // Adjust WebView constraints when keyboard shows
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+    ```
 
     **Android:**
-```xml
-    <!-- In AndroidManifest.xml -->
-    <activity
-        android:name=".WebViewActivity"
-        android:windowSoftInputMode="adjustResize">
-    </activity>
-```
+
+    ```xml
+        <!-- In AndroidManifest.xml -->
+        <activity
+            android:name=".WebViewActivity"
+            android:windowSoftInputMode="adjustResize">
+        </activity>
+    ```
 
     See [Best Practices - Mobile Integration](/webview/best-practices#mobile-app-integration) for complete code.
   </Accordion>
-
   <Accordion title="User can zoom and breaks layout">
     **Problem:** Users can pinch-to-zoom and it breaks the layout.
 
     **Solution:** Disable zoom in your WebView.
 
     **Web:**
-```html
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-```
+
+    ```html
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    ```
 
     **iOS:**
-```swift
-    webView.scrollView.isScrollEnabled = false
-    webView.scrollView.bounces = false
-```
+
+    ```swift
+        webView.scrollView.isScrollEnabled = false
+        webView.scrollView.bounces = false
+    ```
 
     **Android:**
-```kotlin
-    webView.settings.apply {
-        setSupportZoom(false)
-        builtInZoomControls = false
-    }
-```
+
+    ```kotlin
+        webView.settings.apply {
+            setSupportZoom(false)
+            builtInZoomControls = false
+        }
+    ```
 
     See [Best Practices - Disable Zoom](/webview/best-practices#disable-zoom) for details.
   </Accordion>
-
   <Accordion title="Links don't open from iframe">
     **Problem:** External links clicked in Doshi Frontend don't open.
 
     **Cause:** Popups are blocked for security reasons.
 
     **Solution:** Implement postMessage callback to handle link clicks.
-```typescript
-    window.addEventListener('message', (event) => {
-      if (event.origin !== 'https://embed.doshi.app') return;
-      
-      const data = JSON.parse(event.data);
-      
-      if (data.type === 'EXTERNAL_LINK') {
-        // Handle the link in your environment
-        window.open(data.url, '_blank', 'noopener,noreferrer');
-      }
-    });
-```
+
+    ```typescript
+        window.addEventListener('message', (event) => {
+          if (event.origin !== 'https://embed.v2.doshi.app') return;
+          
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'EXTERNAL_LINK') {
+            // Handle the link in your environment
+            window.open(data.url, '_blank', 'noopener,noreferrer');
+          }
+        });
+    ```
 
     See [Best Practices - Handling Link Clicks](/webview/best-practices#handling-link-clicks) for platform-specific implementations.
   </Accordion>
-
   <Accordion title="WebView not loading on mobile">
     **Problem:** Doshi Frontend doesn't load in mobile WebView.
 
     **Solutions:**
 
     1. **Enable JavaScript:**
-```kotlin
-    // Android
-    webView.settings.javaScriptEnabled = true
-    webView.settings.domStorageEnabled = true
-```
-```swift
-    // iOS
-    let preferences = WKPreferences()
-    preferences.javaScriptEnabled = true
-    webConfiguration.preferences = preferences
-```
+
+    ```kotlin
+        // Android
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+    ```
+
+    ```swift
+        // iOS
+        let preferences = WKPreferences()
+        preferences.javaScriptEnabled = true
+        webConfiguration.preferences = preferences
+    ```
 
     2. **Check HTTPS:**
-    - Ensure you're loading `https://embed.doshi.app`
+
+    - Ensure you're loading `https://embed.v2.doshi.app`
     - iOS requires HTTPS by default (App Transport Security)
 
     3. **Check App Permissions:**
-```xml
-    <!-- Android: In AndroidManifest.xml -->
-    <uses-permission android:name="android.permission.INTERNET" />
-```
-```xml
-    <!-- iOS: In Info.plist (if using HTTP for testing) -->
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSAllowsArbitraryLoads</key>
-        <true/>
-    </dict>
-```
+
+    ```xml
+        <!-- Android: In AndroidManifest.xml -->
+        <uses-permission android:name="android.permission.INTERNET" />
+    ```
+
+    ```xml
+        <!-- iOS: In Info.plist (if using HTTP for testing) -->
+        <key>NSAppTransportSecurity</key>
+        <dict>
+            <key>NSAllowsArbitraryLoads</key>
+            <true/>
+        </dict>
+    ```
   </Accordion>
 </AccordionGroup>
-
 
 ### Network Issues
 
@@ -658,65 +694,69 @@ description: "Common issues and solutions for webview authentication"
     **Solutions:**
 
     1. **Add timeout:**
-```typescript
-    const AUTH_TIMEOUT = 10000; // 10 seconds
-    
-    const authenticateWithTimeout = () => {
-      return Promise.race([
-        authenticate(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), AUTH_TIMEOUT)
-        )
-      ]);
-    };
-```
+
+    ```typescript
+        const AUTH_TIMEOUT = 10000; // 10 seconds
+        
+        const authenticateWithTimeout = () => {
+          return Promise.race([
+            authenticate(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), AUTH_TIMEOUT)
+            )
+          ]);
+        };
+    ```
 
     2. **Show loading state:**
-```tsx
-    <div className="loading">
-      <Spinner />
-      <p>This may take a moment...</p>
-    </div>
-```
+
+    ```tsx
+        <div className="loading">
+          <Spinner />
+          <p>This may take a moment...</p>
+        </div>
+    ```
 
     3. **Preconnect to domain:**
-```html
-    <link rel="preconnect" href="https://embed.doshi.app">
-    <link rel="dns-prefetch" href="https://embed.doshi.app">
-```
-  </Accordion>
 
+    ```html
+        <link rel="preconnect" href="https://embed.v2.doshi.app">
+        <link rel="dns-prefetch" href="https://embed.v2.doshi.app">
+    ```
+  </Accordion>
   <Accordion title="Intermittent failures">
     **Problem:** Authentication works sometimes but fails randomly.
 
     **Solutions:**
 
     1. **Implement retry logic:**
-```typescript
-    const authenticateWithRetry = async (maxRetries = 3) => {
-      for (let i = 0; i < maxRetries; i++) {
-        try {
-          return await authenticate();
-        } catch (error) {
-          if (i === maxRetries - 1) throw error;
-          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-        }
-      }
-    };
-```
+
+    ```typescript
+        const authenticateWithRetry = async (maxRetries = 3) => {
+          for (let i = 0; i < maxRetries; i++) {
+            try {
+              return await authenticate();
+            } catch (error) {
+              if (i === maxRetries - 1) throw error;
+              await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+            }
+          }
+        };
+    ```
 
     2. **Check network status:**
-```javascript
-    if (!navigator.onLine) {
-      setError('No internet connection');
-      return;
-    }
-    
-    window.addEventListener('online', () => {
-      console.log('Connection restored');
-      retry();
-    });
-```
+
+    ```javascript
+        if (!navigator.onLine) {
+          setError('No internet connection');
+          return;
+        }
+        
+        window.addEventListener('online', () => {
+          console.log('Connection restored');
+          retry();
+        });
+    ```
   </Accordion>
 </AccordionGroup>
 
@@ -729,33 +769,33 @@ description: "Common issues and solutions for webview authentication"
     **Cause:** Your server IP is not whitelisted.
 
     **Solution:**
-    
+
     1. Find your server IP:
-```bash
-    curl ifconfig.me
-```
+
+    ```bash
+        curl ifconfig.me
+    ```
 
     2. Email [hello@doshi.app](mailto:hello@doshi.app) with:
        - Your organization name
        - Your server IP address
        - Whether it's for production or staging
-
     3. Wait for confirmation that your IP is whitelisted
   </Accordion>
-
   <Accordion title="Works in one environment, not another">
     **Problem:** API works in staging but not production (or vice versa).
 
     **Cause:** Different servers have different IPs.
 
     **Solution:**
-    
+
     Get the IP from each server and have all of them whitelisted:
-```bash
-    # Run on each server
-    curl ifconfig.me
-```
-    
+
+    ```bash
+        # Run on each server
+        curl ifconfig.me
+    ```
+
     Contact [hello@doshi.app](mailto:hello@doshi.app) with all IPs.
   </Accordion>
 </AccordionGroup>
@@ -763,6 +803,7 @@ description: "Common issues and solutions for webview authentication"
 ## Debugging Tools
 
 ### Enable Debug Logging
+
 ```typescript
 // config.ts
 export const DEBUG = process.env.NODE_ENV === 'development';
@@ -786,6 +827,7 @@ logger.error('Authentication failed:', error);
 ```
 
 ### Message Inspector
+
 ```javascript
 // Log all messages for debugging
 window.addEventListener("message", (event) => {
@@ -799,6 +841,7 @@ window.addEventListener("message", (event) => {
 ```
 
 ### Network Monitor
+
 ```javascript
 // Monitor all fetch requests
 const originalFetch = window.fetch;
@@ -811,6 +854,7 @@ window.fetch = async (...args) => {
 ```
 
 ### Check iframe Status
+
 ```javascript
 function debugIframe() {
   const iframe = document.querySelector('iframe');
@@ -827,21 +871,66 @@ function debugIframe() {
 
 ## Testing Checklist
 
-<Check>Test with valid credentials</Check>
-<Check>Test with invalid credentials</Check>
-<Check>Test with missing token</Check>
-<Check>Test with expired token</Check>
-<Check>Test 2FA flow (if enabled)</Check>
-<Check>Test on Chrome</Check>
-<Check>Test on Firefox</Check>
-<Check>Test on Safari</Check>
-<Check>Test on Edge</Check>
-<Check>Test on mobile Safari (iOS)</Check>
-<Check>Test on mobile Chrome (Android)</Check>
-<Check>Test with slow network (throttling)</Check>
-<Check>Test with offline/online transitions</Check>
-<Check>Test timeout scenarios</Check>
-<Check>Test error recovery</Check>
+<Check>
+  Test with valid credentials
+</Check>
+
+ <Check>
+  Test with invalid credentials
+</Check>
+
+ <Check>
+  Test with missing token
+</Check>
+
+ <Check>
+  Test with expired token
+</Check>
+
+ <Check>
+  Test 2FA flow (if enabled)
+</Check>
+
+ <Check>
+  Test on Chrome
+</Check>
+
+ <Check>
+  Test on Firefox
+</Check>
+
+ <Check>
+  Test on Safari
+</Check>
+
+ <Check>
+  Test on Edge
+</Check>
+
+ <Check>
+  Test on mobile Safari (iOS)
+</Check>
+
+ <Check>
+  Test on mobile Chrome (Android)
+</Check>
+
+ <Check>
+  Test with slow network (throttling)
+</Check>
+
+ <Check>
+  Test with offline/online transitions
+</Check>
+
+ <Check>
+  Test timeout scenarios
+</Check>
+
+ <Check>
+  Test error recovery
+</Check>
+
 
 ## Getting Help
 
@@ -849,7 +938,8 @@ If you're still experiencing issues after trying these solutions:
 
 <CardGroup cols={2}>
   <Card title="Contact Support" icon="envelope" href="mailto:hello@doshi.app">
-    Email us at hello@doshi.app with:
+    Email us at [hello@doshi.app](mailto:hello@doshi.app) with:
+
     - Detailed description of the issue
     - Browser and OS information
     - Any error messages
@@ -862,17 +952,17 @@ If you're still experiencing issues after trying these solutions:
 
 ## Quick Fixes Reference
 
-| Issue | Quick Fix |
-|-------|-----------|
-| Messages not received | Check `event.origin` validation |
-| Token not working | Generate fresh token, don't reuse |
-| API key exposed | Move to backend immediately |
-| URL too long | Switch to postMessage |
-| 2FA not showing | Verify `is2FaEnabled: true` and all required fields |
-| Slow loading | Add preconnect, implement timeout |
-| Origin mismatch | Log and compare actual vs expected origins |
-| CORS errors | Ensure all URLs use HTTPS |
-| Iframe not loading | Check src attribute and network tab |
+| Issue                 | Quick Fix                                           |
+| --------------------- | --------------------------------------------------- |
+| Messages not received | Check `event.origin` validation                     |
+| Token not working     | Generate fresh token, don't reuse                   |
+| API key exposed       | Move to backend immediately                         |
+| URL too long          | Switch to postMessage                               |
+| 2FA not showing       | Verify `is2FaEnabled: true` and all required fields |
+| Slow loading          | Add preconnect, implement timeout                   |
+| Origin mismatch       | Log and compare actual vs expected origins          |
+| CORS errors           | Ensure all URLs use HTTPS                           |
+| Iframe not loading    | Check src attribute and network tab                 |
 
 ## Next Steps
 

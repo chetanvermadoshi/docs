@@ -14,6 +14,7 @@ Security is paramount when implementing webview authentication. This guide cover
 </Warning>
 
 To get your server's IP address:
+
 ```bash
 # Run this command on your server
 curl ifconfig.me
@@ -28,6 +29,7 @@ Send this IP address to [hello@doshi.app](mailto:hello@doshi.app) along with you
 </Warning>
 
 ### Secure API Key Usage
+
 ```typescript
 // ❌ NEVER do this - API key exposed in frontend
 const response = await fetch('https://api.doshi.app/client/auth/token', {
@@ -44,6 +46,7 @@ const response = await fetch('https://your-backend.com/api/generate-doshi-token'
 ```
 
 ### Backend Implementation Example
+
 ```typescript
 // Your backend server
 app.post('/api/generate-doshi-token', async (req, res) => {
@@ -77,10 +80,11 @@ app.post('/api/generate-doshi-token', async (req, res) => {
 </Warning>
 
 ### For postMessage
+
 ```javascript
 window.addEventListener("message", (event) => {
   // ✅ Verify origin in production
-  if (event.origin !== 'https://embed.doshi.app') {
+  if (event.origin !== 'https://embed.v2.doshi.app') {
     console.warn('Rejected message from unauthorized origin:', event.origin);
     return;
   }
@@ -90,22 +94,25 @@ window.addEventListener("message", (event) => {
 ```
 
 ### Specify Target Origins
+
 ```javascript
 // ❌ Never use in production
 webview.contentWindow.postMessage(data, "*");
 
 // ✅ Always specify exact origin in production
-webview.contentWindow.postMessage(data, "https://embed.doshi.app");
+webview.contentWindow.postMessage(data, "https://embed.v2.doshi.app");
 ```
 
 ## Token Security
 
 ### Token Lifecycle
 
-The nonce token received from the API:
+The custom token received from the API:
+
 - Is single-use for initial authentication
 - Has a short expiration time
 - Cannot be reused after the user session is established
+
 ```typescript
 // After getting the token, use it immediately
 const { token } = await getTokenFromBackend();
@@ -120,6 +127,7 @@ passTokenToIframe(token);
 ### Session Tokens
 
 Once authenticated:
+
 - **ID Token TTL**: 1 hour
 - **Refresh Token TTL**: 12 hours
 - The iframe manages token refresh automatically
@@ -132,73 +140,75 @@ Once authenticated:
 <AccordionGroup>
   <Accordion title="Message Validation">
     Always validate the structure and content of messages:
-```javascript
-    try {
-      const data = typeof event.data === "string" 
-        ? JSON.parse(event.data) 
-        : event.data;
-      
-      // Validate message structure
-      if (!data.type || typeof data.type !== 'string') {
-        throw new Error('Invalid message structure');
-      }
-      
-      // Validate expected message types
-      const validTypes = ['PING', 'AUTH', 'AUTH_SUCCESS', 'AUTH_ERROR'];
-      if (!validTypes.includes(data.type)) {
-        throw new Error(`Unexpected message type: ${data.type}`);
-      }
-      
-      // Process valid message
-    } catch (error) {
-      console.error("Error processing message:", error);
-      return;
-    }
-```
-  </Accordion>
 
+    ```javascript
+        try {
+          const data = typeof event.data === "string" 
+            ? JSON.parse(event.data) 
+            : event.data;
+          
+          // Validate message structure
+          if (!data.type || typeof data.type !== 'string') {
+            throw new Error('Invalid message structure');
+          }
+          
+          // Validate expected message types
+          const validTypes = ['PING', 'AUTH', 'AUTH_SUCCESS', 'AUTH_ERROR'];
+          if (!validTypes.includes(data.type)) {
+            throw new Error(`Unexpected message type: ${data.type}`);
+          }
+          
+          // Process valid message
+        } catch (error) {
+          console.error("Error processing message:", error);
+          return;
+        }
+    ```
+  </Accordion>
   <Accordion title="Error Handling">
     Implement comprehensive error handling:
-```javascript
-    const handleMessage = (event) => {
-      try {
-        // Verify origin
-        if (event.origin !== 'https://embed.doshi.app') return;
-        
-        // Parse and validate
-        const data = JSON.parse(event.data);
-        
-        // Process message
-      } catch (error) {
-        console.error('Message handling failed:', error);
-        // Log to monitoring service
-        logError(error);
-      }
-    };
-```
-  </Accordion>
 
+    ```javascript
+        const handleMessage = (event) => {
+          try {
+            // Verify origin
+            if (event.origin !== 'https://embed.v2.doshi.app') return;
+            
+            // Parse and validate
+            const data = JSON.parse(event.data);
+            
+            // Process message
+          } catch (error) {
+            console.error('Message handling failed:', error);
+            // Log to monitoring service
+            logError(error);
+          }
+        };
+    ```
+  </Accordion>
   <Accordion title="HTTPS Enforcement">
     Always use HTTPS for secure communication:
-```javascript
-    // ✅ Secure HTTPS URL
-    const webviewUrl = "https://embed.doshi.app";
 
-    // ❌ Never use HTTP in production
-    const insecureUrl = "http://embed.doshi.app";
-```
+    ```javascript
+        // ✅ Secure HTTPS URL
+        const webviewUrl = "https://embed.v2.doshi.app";
+    
+        // ❌ Never use HTTP in production
+        const insecureUrl = "http://embed.v2.doshi.app";
+    ```
   </Accordion>
 </AccordionGroup>
 
 ## Query Parameter Security
 
 <Warning>
-  Query parameters are visible in URLs and browser history. The nonce token is short-lived but still sensitive.
+  Query parameters are visible in URLs and browser history. The custom token is short-lived but still sensitive.
 </Warning>
 
 ### Best Practices
 
 1. **Clear Parameters After Use**
+
 ```javascript
 // After iframe loads, clear sensitive params
 window.addEventListener('load', () => {
@@ -212,7 +222,8 @@ window.addEventListener('load', () => {
 
 2. **Use Short-Lived Tokens**
 
-The nonce token from the API is already short-lived, but you can add additional validation:
+The custom token from the API is already short-lived, but you can add additional validation:
+
 ```typescript
 // Backend - add timestamp to token generation
 const tokenData = {
@@ -228,6 +239,7 @@ const isTokenFresh = (timestamp: number) => {
 ```
 
 3. **Monitor Token Usage**
+
 ```typescript
 // Log token usage for security monitoring
 app.post('/api/generate-doshi-token', async (req, res) => {
@@ -250,6 +262,7 @@ app.post('/api/generate-doshi-token', async (req, res) => {
 <Note>
   URLs should generally stay under 2000 characters for maximum browser compatibility
 </Note>
+
 ```javascript
 function buildWebviewUrl(baseUrl, params) {
   const urlParams = new URLSearchParams(params);
@@ -267,10 +280,11 @@ function buildWebviewUrl(baseUrl, params) {
 ## 2FA Security
 
 When implementing 2FA:
+
 ```typescript
 // Only pass 2FA parameters when explicitly enabled
 const authData = {
-  token: nonceToken,
+  token: customToken,
   email: user.email,
   // Only include these if 2FA is actually enabled
   ...(is2FaEnabled && {
@@ -285,17 +299,18 @@ const authData = {
 ```
 
 ### Don't Send Unnecessary Data
+
 ```typescript
 // ❌ Don't send sensitive data if not needed
 const authData = {
-  token: nonceToken,
+  token: customToken,
   ssn: user.ssn,  // Never send unless absolutely required
   password: user.password  // Never send passwords
 };
 
 // ✅ Only send required fields
 const authData = {
-  token: nonceToken,
+  token: customToken,
   email: user.email,
   segment: 'premium'
 };
@@ -303,32 +318,69 @@ const authData = {
 
 ## Security Checklist
 
-<Check>Store API key securely in backend environment variables</Check>
-<Check>Never expose API key in client-side code</Check>
-<Check>Call Doshi API only from your backend server</Check>
-<Check>Use HTTPS for all communication</Check>
-<Check>Verify message origins in production</Check>
-<Check>Never use "*" wildcard for target origins in production</Check>
-<Check>Validate all incoming messages and parameters</Check>
-<Check>Use short-lived tokens</Check>
-<Check>Clear sensitive data from URLs after reading</Check>
-<Check>Implement comprehensive error handling</Check>
-<Check>Log security events for monitoring</Check>
-<Check>Test across different browsers and environments</Check>
+<Check>
+  Store API key securely in backend environment variables
+</Check>
+
+ <Check>
+  Never expose API key in client-side code
+</Check>
+
+ <Check>
+  Call Doshi API only from your backend server
+</Check>
+
+ <Check>
+  Use HTTPS for all communication
+</Check>
+
+ <Check>
+  Verify message origins in production
+</Check>
+
+ <Check>
+  Never use "\*" wildcard for target origins in production
+</Check>
+
+ <Check>
+  Validate all incoming messages and parameters
+</Check>
+
+ <Check>
+  Use short-lived tokens
+</Check>
+
+ <Check>
+  Clear sensitive data from URLs after reading
+</Check>
+
+ <Check>
+  Implement comprehensive error handling
+</Check>
+
+ <Check>
+  Log security events for monitoring
+</Check>
+
+ <Check>
+  Test across different browsers and environments
+</Check>
+
 
 ## Common Security Pitfalls
 
-| Pitfall | Risk | Solution |
-|---------|------|----------|
-| API key in frontend | Anyone can steal your key | Call API from backend only |
-| Using `"*"` for postMessage target | Any site can receive messages | Specify exact origin |
-| Sensitive tokens in URLs | Exposed in logs/history | Use postMessage or clear params |
-| No origin verification | Malicious sites can send messages | Always check `event.origin` |
-| Missing input validation | XSS vulnerabilities | Validate all inputs |
-| Long-lived tokens | Increased attack window | Use short expiration times |
-| Storing tokens in localStorage | XSS attacks can steal tokens | Let iframe manage sessions |
+| Pitfall                            | Risk                              | Solution                        |
+| ---------------------------------- | --------------------------------- | ------------------------------- |
+| API key in frontend                | Anyone can steal your key         | Call API from backend only      |
+| Using `"*"` for postMessage target | Any site can receive messages     | Specify exact origin            |
+| Sensitive tokens in URLs           | Exposed in logs/history           | Use postMessage or clear params |
+| No origin verification             | Malicious sites can send messages | Always check `event.origin`     |
+| Missing input validation           | XSS vulnerabilities               | Validate all inputs             |
+| Long-lived tokens                  | Increased attack window           | Use short expiration times      |
+| Storing tokens in localStorage     | XSS attacks can steal tokens      | Let iframe manage sessions      |
 
 ## Environment-Specific Configuration
+
 ```typescript
 // config.ts
 const config = {
@@ -339,7 +391,7 @@ const config = {
   },
   production: {
     doshiApiUrl: 'https://api.doshi.app',
-    doshiEmbedUrl: 'https://embed.doshi.app',
+    doshiEmbedUrl: 'https://embed.v2.doshi.app',
     strictOriginCheck: true
   }
 };
@@ -350,6 +402,7 @@ export default config[env];
 ```
 
 ## Monitoring and Logging
+
 ```typescript
 // Log security-relevant events
 const logSecurityEvent = async (event: SecurityEvent) => {

@@ -8,14 +8,14 @@ description: "Implement simple URL-based authentication using query parameters"
 Query parameter authentication is a simpler approach that passes authentication data through the URL. This method is ideal for quick implementation and debugging.
 
 <Warning>
-  Query parameters are visible in URLs and browser history. While the nonce token is short-lived, consider using postMessage for production environments.
+  Query parameters are visible in URLs and browser history. While the custom token is short-lived, consider using postMessage for production environments.
 </Warning>
 
 ## How It Works
 
 <Steps>
-  <Step title="Generate Nonce Token">
-    Your backend calls the Doshi API to get a nonce token
+  <Step title="Generate Custom Token">
+    Your backend calls the Doshi API to get a custom token
   </Step>
   <Step title="Build URL">
     Construct the webview URL with the token and other data as query parameters
@@ -31,6 +31,7 @@ Query parameter authentication is a simpler approach that passes authentication 
 ## React Implementation
 
 ### Complete Example with API Call
+
 ```tsx
 import React, { useEffect, useState, useMemo } from "react";
 
@@ -112,7 +113,7 @@ const WebviewWithQueryParams: React.FC<Props> = ({
   const webviewUrl = useMemo(() => {
     if (!authToken) return null;
 
-    const baseUrl = "https://embed.doshi.app";
+    const baseUrl = "https://embed.v2.doshi.app";
     const params = new URLSearchParams();
     
     // Required
@@ -194,6 +195,7 @@ export default WebviewWithQueryParams;
 ```
 
 ### Usage Example
+
 ```tsx
 import WebviewWithQueryParams from './WebviewWithQueryParams';
 
@@ -234,10 +236,11 @@ function AppWith2FA() {
 ## Vanilla JavaScript Implementation
 
 ### Parent Window
+
 ```javascript
 // Configuration
 const config = {
-  doshiEmbedUrl: 'https://embed.doshi.app',
+  doshiEmbedUrl: 'https://embed.v2.doshi.app',
   backendUrl: '/api/generate-doshi-token'
 };
 
@@ -384,6 +387,7 @@ createDoshiEmbed();
 ```
 
 ### HTML Structure
+
 ```html
 <!DOCTYPE html>
 <html lang="en">
@@ -465,6 +469,7 @@ createDoshiEmbed();
 </Note>
 
 ### Reading Parameters
+
 ```javascript
 // Inside the webview, extract query parameters
 function getAuthDataFromUrl() {
@@ -506,6 +511,7 @@ if (authData.is2FaEnabled) {
 <Tip>
   Clear sensitive parameters from the URL after reading to prevent exposure in browser history
 </Tip>
+
 ```javascript
 // Clear sensitive params from URL after reading
 function clearUrlParams() {
@@ -529,6 +535,7 @@ clearUrlParams();
 ## URL Encoding
 
 Properly encode special characters in parameters:
+
 ```javascript
 function buildSecureUrl(baseUrl, data) {
   const params = new URLSearchParams();
@@ -601,15 +608,15 @@ function buildSecureUrl(baseUrl, data) {
 
 ## Comparison: postMessage vs Query Parameters
 
-| Feature | Query Parameters | postMessage |
-|---------|------------------|-------------|
-| **Security** | Visible in URLs | Hidden from URLs |
-| **Complexity** | Simple | Moderate |
-| **Real-time** | No | Yes |
-| **URL Length** | Limited (~2000 chars) | No limit |
-| **Debugging** | Easy (visible in URL) | Requires dev tools |
-| **2FA Support** | Yes | Yes |
-| **Best For** | Simple auth, quick setup | Sensitive data, production apps |
+| Feature         | Query Parameters         | postMessage                     |
+| --------------- | ------------------------ | ------------------------------- |
+| **Security**    | Visible in URLs          | Hidden from URLs                |
+| **Complexity**  | Simple                   | Moderate                        |
+| **Real-time**   | No                       | Yes                             |
+| **URL Length**  | Limited (~2000 chars)    | No limit                        |
+| **Debugging**   | Easy (visible in URL)    | Requires dev tools              |
+| **2FA Support** | Yes                      | Yes                             |
+| **Best For**    | Simple auth, quick setup | Sensitive data, production apps |
 
 ## Common Issues
 
@@ -618,41 +625,42 @@ function buildSecureUrl(baseUrl, data) {
     **Problem:** URL exceeds browser limits (typically 2000 characters).
 
     **Solutions:**
+
     1. Use shorter tokens or references
     2. Switch to postMessage method
     3. Only include essential parameters
   </Accordion>
-
   <Accordion title="Special characters not encoding properly">
     **Problem:** Special characters in parameters causing issues.
 
     **Solution:**
-```javascript
-    // Use URLSearchParams for automatic encoding
-    const params = new URLSearchParams();
-    params.append('email', 'user+test@example.com'); // Properly encoded
-    params.append('name', 'John & Jane'); // Properly encoded
-```
-  </Accordion>
 
+    ```javascript
+        // Use URLSearchParams for automatic encoding
+        const params = new URLSearchParams();
+        params.append('email', 'user+test@example.com'); // Properly encoded
+        params.append('name', 'John & Jane'); // Properly encoded
+    ```
+  </Accordion>
   <Accordion title="Parameters not being read">
     **Problem:** Query parameters not accessible in the webview.
 
     **Solution:**
-```javascript
-    // Debug parameter reading
-    console.log('Current URL:', window.location.href);
-    console.log('Search params:', window.location.search);
-    
-    const params = new URLSearchParams(window.location.search);
-    console.log('All params:', Object.fromEntries(params));
-    
-    // Check for specific param
-    const token = params.get('token');
-    if (!token) {
-      console.error('Token parameter missing from URL');
-    }
-```
+
+    ```javascript
+        // Debug parameter reading
+        console.log('Current URL:', window.location.href);
+        console.log('Search params:', window.location.search);
+        
+        const params = new URLSearchParams(window.location.search);
+        console.log('All params:', Object.fromEntries(params));
+        
+        // Check for specific param
+        const token = params.get('token');
+        if (!token) {
+          console.error('Token parameter missing from URL');
+        }
+    ```
   </Accordion>
 </AccordionGroup>
 

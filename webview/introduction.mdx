@@ -7,10 +7,10 @@ description: "Learn how to implement secure webview-based authentication in your
 
 Doshi provides a secure webview authentication system that uses a two-step process:
 
-1. **Generate a nonce token** from the Doshi API using your API key
+1. **Generate a custom token** from the Doshi API using your API key
 2. **Pass the token** to the embedded Doshi iframe
 
-This guide explains the authentication methods available after you've obtained your nonce token.
+This guide explains the authentication methods available after you've obtained your custom token.
 
 <Note>
   New to Doshi authentication? Start with the [Quick Start Guide](/webview/quickstart) for a complete walkthrough.
@@ -18,7 +18,7 @@ This guide explains the authentication methods available after you've obtained y
 
 ## Authentication Methods
 
-After obtaining your nonce token from the API, you can pass it to the iframe using two methods:
+After obtaining your custom token from the API, you can pass it to the iframe using two methods:
 
 <CardGroup cols={2}>
   <Card title="postMessage API" icon="message" href="/webview/postmessage">
@@ -37,7 +37,7 @@ After obtaining your nonce token from the API, you can pass it to the iframe usi
 
 <Steps>
   <Step title="Client Calls API">
-    Your backend calls `/client/auth/token` with your API key to generate a nonce token
+    Your backend calls `/client/auth/token` with your API key to generate a custom token
   </Step>
   <Step title="Pass Token to Iframe">
     Your frontend passes the token to the Doshi iframe using postMessage or query parameters
@@ -56,7 +56,7 @@ After obtaining your nonce token from the API, you can pass it to the iframe usi
 
 ```typescript
 interface AuthData {
-  token: string; // Nonce token from API (required)
+  token: string; // Custom token from API (required)
 }
 ```
 
@@ -85,7 +85,7 @@ interface AuthData {
 
 Contact [hello@doshi.app](mailto:hello@doshi.app) to receive your static API key.
 
-### 2. Generate Nonce Token
+### 2. Generate Custom Token
 
 ```bash
 curl -X POST https://api.doshi.app/client/auth/token \
@@ -102,7 +102,7 @@ See the [full API reference](/api-reference/auth/get-custom-authentication-token
 
 ```html
 <iframe
-  src="https://embed.doshi.app"
+  src="https://embed.v2.doshi.app"
   class="w-full h-screen"
   frameborder="0"
   allowfullscreen
@@ -121,11 +121,11 @@ window.addEventListener("message", (event) => {
   if (event.data.type === "PING") {
     iframe.contentWindow.postMessage(
       JSON.stringify({
-        token: "your_nonce_token",
+        token: "your_custom_token",
         email: "user@example.com",
         type: "AUTH"
       }),
-      "https://embed.doshi.app"
+      "https://embed.v2.doshi.app"
     );
   }
 });
@@ -139,7 +139,7 @@ const params = new URLSearchParams({
   segment: "premium"
 });
 
-const iframeUrl = `https://embed.doshi.app?${params.toString()}`;
+const iframeUrl = `https://embed.v2.doshi.app?${params.toString()}`;
 ```
 
 </CodeGroup>
@@ -150,7 +150,7 @@ When 2FA is enabled for your organization, pass the required user information:
 
 ```typescript
 const authData = {
-  token: "your_nonce_token",
+  token: "your_custom_token",
   email: "user@example.com",
   is2FaEnabled: true,
   dob: "1990-01-15",

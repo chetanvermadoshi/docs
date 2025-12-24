@@ -7,7 +7,7 @@ description: "Get started with Doshi webview authentication in minutes"
 
 Doshi webview authentication uses a secure two-step process:
 
-1. **Generate a nonce token** by calling the Doshi API with your API key
+1. **Generate a custom token** by calling the Doshi API with your API key
 2. **Pass the token to the iframe** using postMessage or query parameters
 
 <Warning>
@@ -21,11 +21,11 @@ Doshi webview authentication uses a secure two-step process:
     - Receive your API key
     - Whitelist your server IP address(es)
   </Step>
-  <Step title="Generate Nonce Token">
+  <Step title="Generate Custom Token">
     Call the authentication endpoint with your API key from your whitelisted server
   </Step>
   <Step title="Embed Webview">
-    Pass the nonce token to the Doshi Frontend using postMessage or query parameters
+    Pass the custom token to the Doshi Frontend using postMessage or query parameters
   </Step>
   <Step title="User Signs In">
     Doshi handles the sign-in process, including 2FA if enabled
@@ -42,14 +42,14 @@ sequenceDiagram
     participant User as End User
 
     Client->>API: POST /client/auth/custom-token<br/>(with API Key)
-    API->>Client: Returns nonce token
+    API->>Client: Returns custom token
     Client->>Frontend: Pass token + user data
     Frontend->>User: Shows login/2FA screen if needed
     User->>Frontend: Completes authentication
     Frontend->>Frontend: Session active (1hr + 12hr refresh)
 ```
 
-## Step 1: Generate Nonce Token
+## Step 1: Generate Custom Token
 
 Call the authentication endpoint with your API key:
 
@@ -198,7 +198,7 @@ const DoshiEmbed = () => {
   useEffect(() => {
     // Step 1: Get nonce token from API
     async function authenticate() {
-      const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/custom-token', {
+      const response = await fetch('https://api.doshi.app/client/auth/custom-token', {
         method: 'POST',
         headers: {
           'Authorization': 'Bearer YOUR_API_KEY',
@@ -223,7 +223,7 @@ const DoshiEmbed = () => {
 
     // Step 2: Listen for PING from Doshi Frontend
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== 'https://embed.doshi.app') return;
+      if (event.origin !== 'https://embed.v2.doshi.app') return;
       
       const data = typeof event.data === "string" 
         ? JSON.parse(event.data) 
@@ -241,7 +241,7 @@ const DoshiEmbed = () => {
               branchId: 'branch_789',     // Optional
               type: "AUTH"
             }),
-            "https://embed.doshi.app"
+            "https://embed.v2.doshi.app"
           );
         }
       }
@@ -257,7 +257,7 @@ const DoshiEmbed = () => {
 
   return (
     <iframe
-      src="https://embed.doshi.app"
+      src="https://embed.v2.doshi.app"
       className="w-full h-screen"
       frameBorder="0"
       allowFullScreen
@@ -279,7 +279,7 @@ const DoshiEmbed = () => {
   useEffect(() => {
     async function authenticate() {
       // Step 1: Get nonce token
-      const response = await fetch('https://production-doshi-api-8kq2.encr.app/client/auth/custom-token', {
+      const response = await fetch('https://api.doshi.app/client/auth/custom-token', {
         method: 'POST',
         headers: {
           'Authorization': 'Bearer YOUR_API_KEY',
@@ -301,7 +301,7 @@ const DoshiEmbed = () => {
         branchId: 'branch_789'          // Optional
       });
       
-      setIframeUrl(`https://embed.doshi.app?${params.toString()}`);
+      setIframeUrl(`https://embed.v2.doshi.app?${params.toString()}`);
     }
 
     authenticate();
