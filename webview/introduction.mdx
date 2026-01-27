@@ -90,6 +90,7 @@ Contact [hello@doshi.app](mailto:hello@doshi.app) to receive your static API key
 ```bash
 curl -X POST https://api.doshi.app/client/auth/token \
   -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Access-Type: client" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com"

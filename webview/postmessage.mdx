@@ -519,6 +519,7 @@ router.post('/generate-doshi-token', async (req, res) => {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${process.env.DOSHI_API_KEY}`,
+          'Access-Type': 'client'
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({

@@ -26,6 +26,7 @@ description: "Common issues and solutions for webview authentication"
         # Test your API key
         curl -X POST https://api.doshi.app/client/auth/token \
           -H "Authorization: Bearer YOUR_API_KEY" \
+          -H "Access-Type: client" \
           -H "Content-Type: application/json" \
           -d '{"email": "test@example.com"}'
     ```
@@ -130,7 +131,8 @@ description: "Common issues and solutions for webview authentication"
         // ❌ NEVER do this in frontend
         const response = await fetch(doshiApiUrl, {
           headers: {
-            'Authorization': `Bearer ${API_KEY}` // EXPOSED!
+            'Authorization': `Bearer ${API_KEY}`, // EXPOSED!
+            'Access-Type': 'client'
           }
         });
     
@@ -157,7 +159,9 @@ description: "Common issues and solutions for webview authentication"
           // Call Doshi API with server-side API key
           const response = await fetch(doshiApiUrl, {
             headers: {
-              'Authorization': `Bearer ${process.env.DOSHI_API_KEY}`
+              'Authorization': `Bearer ${process.env.DOSHI_API_KEY}`,
+              'Access-Type': 'client'
+              
             }
           });
     
