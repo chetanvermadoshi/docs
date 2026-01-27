@@ -41,6 +41,18 @@
         "description": "Authentication token (API Key) provided by Doshi. Your server's IP address must be whitelisted to use this API. Contact hello@doshi.app to whitelist your IPs."
       }
     },
+    "parameters": {
+      "AccessTypeHeader": {
+        "name": "Access-Type",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": ["client"]
+        },
+        "description": "Must be set to 'client' for all API requests"
+      }
+    },
     "schemas": {
       "Error": {
         "type": "object",
@@ -524,6 +536,11 @@
         "tags": ["Auth"],
         "summary": "Get Custom Authentication Token",
         "description": "Generates a custom Firebase authentication token for a user. Requires either email or partnerUserId. Does not support 2FA/OTP flow.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccessTypeHeader"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -563,6 +580,11 @@
         "tags": ["Academy"],
         "summary": "Get Courses",
         "description": "Fetches a list of available courses for the user's institution.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccessTypeHeader"
+          }
+        ],
         "responses": {
           "200": {
             "description": "A list of courses.",
@@ -592,7 +614,10 @@
         "tags": ["Academy"],
         "summary": "Get Lesson Submissions",
         "description": "Fetches lesson submission data, with optional filters.",
-        "parameters": [
+        "parameters": [   
+          {
+            "$ref": "#/components/parameters/AccessTypeHeader"
+          },
           {
             "name": "levelId",
             "in": "query",
@@ -644,6 +669,11 @@
         "tags": ["Academy"],
         "summary": "Get Lessons",
         "description": "Fetches a list of available lessons, including core and institution-specific lessons.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccessTypeHeader"
+          }
+        ],
         "responses": {
           "200": {
             "description": "A list of lessons.",
@@ -673,6 +703,11 @@
         "tags": ["Academy"],
         "summary": "Get Paths",
         "description": "Fetches a list of available learning paths for the user's institution.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccessTypeHeader"
+          }
+        ],
         "responses": {
           "200": {
             "description": "A list of paths.",
@@ -702,7 +737,10 @@
         "tags": ["Marketplace"],
         "summary": "Get Redeemed Rewards",
         "description": "Fetches a list of rewards redeemed by users, filterable by userId.",
-        "parameters": [
+        "parameters": [  
+          {
+            "$ref": "#/components/parameters/AccessTypeHeader"
+          },
           {
             "name": "userId",
             "in": "query",
@@ -740,6 +778,11 @@
         "tags": ["Marketplace"],
         "summary": "Get Rewards",
         "description": "Fetches a list of available rewards in the marketplace for the user's institution.",
+         "parameters": [
+          {
+            "$ref": "#/components/parameters/AccessTypeHeader"
+          }
+        ],
         "responses": {
           "200": {
             "description": "A list of rewards.",
@@ -770,6 +813,9 @@
         "summary": "Get Users",
         "description": "Fetches a list of users for the institution, optionally filtered by branchId.",
         "parameters": [
+          {
+            "$ref": "#/components/parameters/AccessTypeHeader"
+          },
           {
             "name": "branchId",
             "in": "query",
