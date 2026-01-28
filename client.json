@@ -31,6 +31,10 @@
     {
       "name": "User",
       "description": "Endpoints for user data."
+    },
+    {
+      "name": "Quests",
+      "description": "Endpoints for quest management."
     }
   ],
   "components": {
@@ -522,7 +526,7 @@
           }
         },
         "required": ["users", "total"]
-      }
+      },
       "SubmitQuestRequest": {
         "type": "object",
         "properties": {
@@ -813,7 +817,7 @@
         "tags": ["Marketplace"],
         "summary": "Get Rewards",
         "description": "Fetches a list of available rewards in the marketplace for the user's institution.",
-         "parameters": [
+        "parameters": [
           {
             "$ref": "#/components/parameters/AccessTypeHeader"
           }
@@ -842,11 +846,16 @@
         }
       }
     },
-     "/client/quests/submit": {
+    "/client/quests/submit": {
       "post": {
         "tags": ["Quests"],
         "summary": "Submit Quest Result",
         "description": "Submits a quest result for a user by a partner.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccessTypeHeader"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
