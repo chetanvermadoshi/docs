@@ -523,6 +523,41 @@
         },
         "required": ["users", "total"]
       }
+      "SubmitQuestRequest": {
+        "type": "object",
+        "properties": {
+          "questId": {
+            "type": "string"
+          },
+          "partnerUserId": {
+            "type": "string"
+          },
+          "reviewStatus": {
+            "type": "string",
+            "enum": ["APPROVED", "REJECTED"]
+          },
+          "statusMessage": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": ["questId", "partnerUserId", "reviewStatus", "statusMessage"]
+      },
+      "SubmitQuestResponse": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean"
+          },
+          "attemptId": {
+            "type": "string"
+          }
+        },
+        "required": ["isSuccess", "attemptId"]
+      }
     }
   },
   "security": [
@@ -790,6 +825,45 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GetRewardsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+     "/client/quests/submit": {
+      "post": {
+        "tags": ["Quests"],
+        "summary": "Submit Quest Result",
+        "description": "Submits a quest result for a user by a partner.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitQuestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quest submission processed successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitQuestResponse"
                 }
               }
             }
